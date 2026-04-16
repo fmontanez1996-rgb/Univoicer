@@ -4008,6 +4008,7 @@
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
       gap: 10px;
+      align-items: start;
     }
     .character-inline-editor label {
       display: grid;
@@ -4056,6 +4057,9 @@
       padding: 8px;
       display: grid;
       gap: 8px;
+    }
+    .compact-multi-select__panel[hidden] {
+      display: none;
     }
     .compact-multi-select__options {
       max-height: 170px;

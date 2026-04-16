@@ -3689,8 +3689,11 @@
         return acc;
       }, {});
       const defaultActorsForVideo = getActorsForUniverseCharacter(defaultCharacterForVideo);
-      const characterOptionsForVideo = getCharacterOptionsForSelect({ universeName: state.universe });
-      const actorOptionsForCharacterMode = getActorOptionsForSelect({ universeName: state.universe });
+      const collectionActors = [...new Set(
+        (collectionModel.actors || [])
+          .map((actor) => String(actor?.name || '').trim())
+          .filter(Boolean)
+      )].sort((a, b) => a.localeCompare(b, 'es', { sensitivity: 'base' }));
       const filtered = getFilteredUniverseVideos().filter((video) => {
         const personaje = (video.personaje || '').toLowerCase();
         const actor = (video.actor_de_doblaje || '').toLowerCase();
@@ -3862,12 +3865,12 @@
                 ${rarezas.map(r => `<option value="${r}">${r}</option>`).join('')}
               </select>
             </label>
-            <label>Actor de doblaje (Opcional)
-              <input type="text" name="actor_de_doblaje_label" list="videoActorCatalogCharacterMode" placeholder="Busca un actor del catálogo">
-              <input type="hidden" name="actor_de_doblaje">
-              <datalist id="videoActorCatalogCharacterMode">
-                ${actorOptionsForCharacterMode.map((item) => `<option value="${escapeHtml(item.name)}"></option>`).join('')}
-              </datalist>
+            <label>Actores de doblaje (Opcional)
+              <select name="actor_de_doblaje" multiple size="${Math.max(4, Math.min(collectionActors.length + 1, 8))}">
+                <option value="Sin actor">Sin actor</option>
+                ${collectionActors.map(actorName => `<option value="${actorName}">${actorName}</option>`).join('')}
+              </select>
+              <small class="muted">Selecciona uno o más actores existentes.</small>
             </label>
             <label>URL de YouTube (Opcional)
               <input type="url" name="url_youtube" placeholder="https://www.youtube.com/watch?v=...">
@@ -4147,6 +4150,9 @@
         const formData = new FormData(addVideoForm);
         const characterName = String(formData.get('personaje') || '').trim();
         const actorName = String(formData.get('actor_de_doblaje') || '').trim();
+        const selectedActors = formData.getAll('actor_de_doblaje')
+          .map((value) => String(value || '').trim())
+          .filter(Boolean);
         if (state.universeAddMode === 'character') {
           if (!characterName) {
             if (feedback) feedback.textContent = 'Debes completar el nombre del personaje.';
@@ -4161,13 +4167,8 @@
             return;
           }
           const metadata = normalizedUrl ? await fetchYoutubeMetadata(normalizedUrl) : null;
-          const actorOptions = getActorOptionsForSelect({ universeName: state.universe });
-          if (actorName && !findCatalogOptionById(actorOptions, actorName)) {
-            if (feedback) feedback.textContent = 'Selecciona un actor existente del catálogo.';
-            return;
-          }
-          const actorList = actorName
-            ? [findCatalogOptionById(actorOptions, actorName)?.name].filter(Boolean)
+          const actorList = selectedActors.length
+            ? [...new Set(selectedActors)]
             : ['Sin actor'];
           const normalizedCharacterName = normalizeName(characterName);
           const actorListToCreate = actorList.filter((actorItem) => {
@@ -5055,11 +5056,17 @@
       const characterName = String(formData.get('characterName') || '').trim();
       const selectedUniverseId = String(formData.get('characterUniverseId') || '').trim();
       const rarity = String(formData.get('characterRarity') || 'Común');
-      const actorId = String(formData.get('characterActorId') || '').trim();
-      const universeOptions = getUniverseOptionsForSelect({ includeUnassigned: false });
-      const selectedUniverse = findCatalogOptionById(universeOptions, selectedUniverseId);
-      const actorOptions = getActorOptionsForSelect();
-      const selectedActor = actorId ? findCatalogOptionById(actorOptions, actorId) : null;
+      const actorByNormalizedName = new Map(
+        (collectionModel.actors || [])
+          .map((actor) => String(actor?.name || '').trim())
+          .filter(Boolean)
+          .map((name) => [normalizeName(name), name])
+      );
+      const actorsInput = formData.getAll('characterActors')
+        .map(value => String(value || '').trim())
+        .filter(Boolean)
+        .map((name) => actorByNormalizedName.get(normalizeName(name)) || '')
+        .filter(Boolean);
 
       if (!characterName) {
         state.draftCharacterFeedback = 'Debes ingresar el nombre del personaje.';
@@ -5607,8 +5614,12 @@
       // VISTA DE GALERÍA DE ÍNDICE (Cuando no hay personaje enfocado)
       // ----------------------------------------------------------------------------------
       const indexItems = getCharactersForIndice(state.indiceSearch);
-      const universeOptions = getUniverseOptionsForSelect({ includeUnassigned: false });
-      const actorOptionsForCharacterForm = getActorOptionsForSelect();
+      const universeOptions = getUniverseOptionsForCharacterForm();
+      const characterActorOptions = [...new Set(
+        (collectionModel.actors || [])
+          .map((actor) => String(actor?.name || '').trim())
+          .filter((name) => Boolean(name) && normalizeName(name) !== normalizeName('Sin actor'))
+      )].sort((a, b) => a.localeCompare(b, 'es', { sensitivity: 'base' }));
       const indexUniverseFilters = getUniverseOptionsForIndiceFilters();
       const indexActorFilters = getActorOptionsForIndiceFilters();
       const rarityGroupLabels = {
@@ -5643,12 +5654,10 @@
                   <option value="Legendario">Legendario</option>
                 </select>
               </label>
-              <label>Actor de doblaje (opcional)
-                <input type="text" name="characterActorLabel" list="characterActorCatalog" placeholder="Busca un actor del catálogo">
-                <input type="hidden" name="characterActorId">
-                <datalist id="characterActorCatalog">
-                  ${actorOptionsForCharacterForm.map((item) => `<option value="${escapeHtml(item.name)}"></option>`).join('')}
-                </datalist>
+              <label>Actores de doblaje (opcional, selecciona uno o más)
+                <select name="characterActors" multiple ${characterActorOptions.length ? '' : 'disabled'}>
+                  ${characterActorOptions.map((actorName) => `<option value="${actorName}">${actorName}</option>`).join('')}
+                </select>
               </label>
               <label>Universo (Obligatorio)
                 <input type="text" name="characterUniverseLabel" list="characterUniverseCatalog" placeholder="Busca un universo" required ${universeOptions.length ? '' : 'disabled'}>
@@ -5662,6 +5671,7 @@
                 <button type="submit" class="neon-btn neon-btn--primary" ${universeOptions.length ? '' : 'disabled'}>Guardar personaje</button>
               </div>
               ${universeOptions.length ? '' : '<p class="muted">Primero debes crear al menos un universo para poder agregar personajes.</p>'}
+              ${characterActorOptions.length ? '<p class="muted">Mantén presionado Ctrl (o Cmd en Mac) para seleccionar varios actores.</p>' : '<p class="muted">No hay actores registrados. Se creará el personaje con "Sin actor".</p>'}
             </form>
           ` : ''}
           <div class="indice-filter-row">

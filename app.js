@@ -110,6 +110,8 @@
     let firebaseDb = null;
     let firebaseStorage = null;
     let cloudSyncTimer = null;
+    let activeCompactMultiSelect = null;
+    let compactMultiSelectOutsideClickBound = false;
     let collectionModel = createEmptyCollectionModel();
     let sharedAudioContext = null;
 
@@ -4462,22 +4464,32 @@
                     ${rarityOptions.map((option) => `<option value="${escapeHtml(option)}" ${option === currentRarity ? 'selected' : ''}>${escapeHtml(option)}</option>`).join('')}
                   </select>
                 </label>
-                <label>Actores (selección múltiple)
-                  <select name="characterActors" multiple size="${Math.max(3, Math.min(actorOptions.length || 3, 8))}">
-                    ${actorOptions.map((actorName) => `<option value="${escapeHtml(actorName)}" ${currentActorsNormalized.has(normalizeName(actorName)) ? 'selected' : ''}>${escapeHtml(actorName)}</option>`).join('')}
-                  </select>
+                <label>Actores
+                  ${renderCompactMultiSelect({
+                    fieldName: 'characterActors',
+                    options: actorOptions,
+                    selectedValues: actorOptions.filter((name) => currentActorsNormalized.has(normalizeName(name))),
+                    placeholder: 'Selecciona actores',
+                    emptyMessage: 'No hay actores disponibles.',
+                    addNewLabel: '＋ Nuevo actor'
+                  })}
                 </label>
-                <label>Universos (selección múltiple)
-                  <select name="characterUniverses" multiple size="${Math.max(3, Math.min(universeOptions.length || 3, 8))}">
-                    ${universeOptions.map((universeName) => `<option value="${escapeHtml(universeName)}" ${currentUniversesNormalized.has(normalizeUniverseName(universeName)) ? 'selected' : ''}>${escapeHtml(universeName)}</option>`).join('')}
-                  </select>
+                <label>Universos
+                  ${renderCompactMultiSelect({
+                    fieldName: 'characterUniverses',
+                    options: universeOptions,
+                    selectedValues: universeOptions.filter((name) => currentUniversesNormalized.has(normalizeUniverseName(name))),
+                    placeholder: 'Selecciona universos',
+                    emptyMessage: 'No hay universos disponibles.',
+                    addNewLabel: '＋ Nuevo universo'
+                  })}
                 </label>
               </div>
               <div class="character-inline-editor__actions">
                 <button type="submit" class="neon-btn neon-btn--primary">Guardar cambios</button>
                 <button type="button" id="cancelCharacterEditor" class="neon-btn">Cancelar</button>
               </div>
-              <p class="muted">Tip: usa Ctrl/Cmd + clic para seleccionar varios actores y universos.</p>
+              <p class="muted">Selecciona un actor o universo y el selector se cerrará automáticamente. Haz clic en una etiqueta para quitarla.</p>
             </form>
           </section>
         </article>
@@ -4489,6 +4501,7 @@
       });
       editModal.querySelector('#closeCharacterEditor')?.addEventListener('click', closeEditor);
       editModal.querySelector('#cancelCharacterEditor')?.addEventListener('click', closeEditor);
+      initializeCompactMultiSelects(editModal);
       editModal.querySelector('#characterEditorFromDetail')?.addEventListener('submit', (event) => {
         event.preventDefault();
         const formData = new FormData(event.currentTarget);
@@ -5135,6 +5148,195 @@
       syncSelection();
     }
 
+    function renderCompactMultiSelect({
+      fieldName,
+      options = [],
+      selectedValues = [],
+      placeholder = 'Seleccionar',
+      emptyMessage = 'No hay opciones disponibles.',
+      addNewLabel = ''
+    }) {
+      const normalizedSeen = new Set();
+      const normalizedSelected = new Set(selectedValues.map((value) => normalizeEntityName(value)));
+      const mergedOptions = [];
+      [...options, ...selectedValues].forEach((rawName) => {
+        const cleanName = String(rawName || '').trim();
+        const normalizedName = normalizeEntityName(cleanName);
+        if (!cleanName || !normalizedName || normalizedSeen.has(normalizedName)) return;
+        normalizedSeen.add(normalizedName);
+        mergedOptions.push(cleanName);
+      });
+      const selectedLabel = selectedValues.length
+        ? `${selectedValues.length} seleccionado${selectedValues.length === 1 ? '' : 's'}`
+        : placeholder;
+      return `
+        <div
+          class="compact-multi-select"
+          data-compact-multi
+          data-field-name="${escapeHtml(fieldName)}"
+          data-placeholder="${escapeHtml(placeholder)}"
+          data-empty-message="${escapeHtml(emptyMessage)}"
+          ${addNewLabel ? `data-add-new-label="${escapeHtml(addNewLabel)}"` : ''}
+        >
+          <button type="button" class="compact-multi-select__trigger" data-compact-trigger aria-expanded="false">
+            <span data-compact-trigger-text>${escapeHtml(selectedLabel)}</span>
+            <span aria-hidden="true">▾</span>
+          </button>
+          <div class="compact-multi-select__panel" data-compact-panel hidden>
+            <div class="compact-multi-select__options" data-compact-options>
+              ${mergedOptions.length
+                ? mergedOptions.map((optionName) => {
+                    const isSelected = normalizedSelected.has(normalizeEntityName(optionName));
+                    return `<button type="button" class="compact-multi-select__option ${isSelected ? 'is-selected' : ''}" data-option-value="${escapeHtml(optionName)}" aria-pressed="${isSelected ? 'true' : 'false'}">${escapeHtml(optionName)}</button>`;
+                  }).join('')
+                : `<p class="compact-multi-select__empty">${escapeHtml(emptyMessage)}</p>`}
+            </div>
+            ${addNewLabel ? `<button type="button" class="compact-multi-select__new" data-compact-new>${escapeHtml(addNewLabel)}</button>` : ''}
+          </div>
+          <div class="compact-multi-select__chips" data-compact-chips></div>
+          <div data-compact-hidden-inputs>
+            ${selectedValues.map((value) => `<input type="hidden" name="${escapeHtml(fieldName)}" value="${escapeHtml(value)}">`).join('')}
+          </div>
+        </div>
+      `;
+    }
+
+    function initializeCompactMultiSelects(rootEl = document) {
+      const selectors = rootEl.querySelectorAll('[data-compact-multi]');
+      if (!selectors.length) return;
+
+      const closeSelector = (selector) => {
+        if (!selector) return;
+        const trigger = selector.querySelector('[data-compact-trigger]');
+        const panel = selector.querySelector('[data-compact-panel]');
+        if (panel) panel.hidden = true;
+        if (trigger) trigger.setAttribute('aria-expanded', 'false');
+        if (activeCompactMultiSelect === selector) activeCompactMultiSelect = null;
+      };
+
+      selectors.forEach((selector) => {
+        const fieldName = String(selector.dataset.fieldName || '').trim();
+        if (!fieldName) return;
+        const trigger = selector.querySelector('[data-compact-trigger]');
+        const triggerText = selector.querySelector('[data-compact-trigger-text]');
+        const panel = selector.querySelector('[data-compact-panel]');
+        const optionsContainer = selector.querySelector('[data-compact-options]');
+        const chipsContainer = selector.querySelector('[data-compact-chips]');
+        const hiddenInputsContainer = selector.querySelector('[data-compact-hidden-inputs]');
+        const addNewButton = selector.querySelector('[data-compact-new]');
+        const placeholder = String(selector.dataset.placeholder || 'Seleccionar').trim();
+        const addNewLabel = String(selector.dataset.addNewLabel || '').trim();
+        const emptyMessage = String(selector.dataset.emptyMessage || 'No hay opciones disponibles.').trim();
+        const selectedValues = new Map();
+        selector.querySelectorAll(`input[type="hidden"][name="${fieldName}"]`).forEach((input) => {
+          const cleanValue = String(input.value || '').trim();
+          const normalized = normalizeEntityName(cleanValue);
+          if (!normalized) return;
+          selectedValues.set(normalized, cleanValue);
+        });
+
+        const syncView = () => {
+          if (hiddenInputsContainer) {
+            hiddenInputsContainer.innerHTML = [...selectedValues.values()]
+              .map((value) => `<input type="hidden" name="${escapeHtml(fieldName)}" value="${escapeHtml(value)}">`)
+              .join('');
+          }
+          if (chipsContainer) {
+            chipsContainer.innerHTML = [...selectedValues.values()].map((value) => `
+              <button type="button" class="compact-multi-select__chip" data-chip-value="${escapeHtml(value)}" title="Quitar ${escapeHtml(value)}">
+                ${escapeHtml(value)} ✕
+              </button>
+            `).join('');
+          }
+          if (triggerText) {
+            triggerText.textContent = selectedValues.size
+              ? `${selectedValues.size} seleccionado${selectedValues.size === 1 ? '' : 's'}`
+              : placeholder;
+          }
+          selector.querySelectorAll('[data-option-value]').forEach((optionBtn) => {
+            const optionValue = String(optionBtn.dataset.optionValue || '').trim();
+            const isSelected = selectedValues.has(normalizeEntityName(optionValue));
+            optionBtn.classList.toggle('is-selected', isSelected);
+            optionBtn.setAttribute('aria-pressed', isSelected ? 'true' : 'false');
+          });
+          if (chipsContainer) {
+            chipsContainer.querySelectorAll('[data-chip-value]').forEach((chipBtn) => {
+              chipBtn.addEventListener('click', () => {
+                const chipValue = String(chipBtn.dataset.chipValue || '').trim();
+                const normalized = normalizeEntityName(chipValue);
+                if (!normalized) return;
+                selectedValues.delete(normalized);
+                syncView();
+              });
+            });
+          }
+        };
+
+        const ensureOptionExists = (value) => {
+          if (!optionsContainer) return;
+          const normalized = normalizeEntityName(value);
+          if (!normalized) return;
+          const existing = [...optionsContainer.querySelectorAll('[data-option-value]')]
+            .some((btn) => normalizeEntityName(btn.dataset.optionValue || '') === normalized);
+          if (existing) return;
+          const optionBtn = document.createElement('button');
+          optionBtn.type = 'button';
+          optionBtn.className = 'compact-multi-select__option';
+          optionBtn.dataset.optionValue = value;
+          optionBtn.textContent = value;
+          optionsContainer.appendChild(optionBtn);
+        };
+
+        if (trigger && panel) {
+          trigger.addEventListener('click', () => {
+            const shouldOpen = panel.hidden;
+            if (activeCompactMultiSelect && activeCompactMultiSelect !== selector) closeSelector(activeCompactMultiSelect);
+            panel.hidden = !shouldOpen;
+            trigger.setAttribute('aria-expanded', shouldOpen ? 'true' : 'false');
+            activeCompactMultiSelect = shouldOpen ? selector : null;
+          });
+        }
+
+        selector.querySelectorAll('[data-option-value]').forEach((optionBtn) => {
+          optionBtn.addEventListener('click', () => {
+            const optionValue = String(optionBtn.dataset.optionValue || '').trim();
+            const normalized = normalizeEntityName(optionValue);
+            if (!normalized) return;
+            if (selectedValues.has(normalized)) selectedValues.delete(normalized);
+            else selectedValues.set(normalized, optionValue);
+            syncView();
+            closeSelector(selector);
+          });
+        });
+
+        addNewButton?.addEventListener('click', () => {
+          const entityType = addNewLabel.toLowerCase().includes('universo') ? 'universo' : 'actor';
+          const typedValue = prompt(`Escribe el nuevo ${entityType}:`, '');
+          if (typedValue === null) return;
+          const cleanValue = String(typedValue || '').trim();
+          const normalized = normalizeEntityName(cleanValue);
+          if (!normalized) return;
+          ensureOptionExists(cleanValue);
+          selectedValues.set(normalized, cleanValue);
+          const emptyNode = optionsContainer?.querySelector('.compact-multi-select__empty');
+          if (emptyNode) emptyNode.remove();
+          syncView();
+          closeSelector(selector);
+        });
+
+        syncView();
+      });
+
+      if (!compactMultiSelectOutsideClickBound) {
+        document.addEventListener('click', (event) => {
+          if (!activeCompactMultiSelect) return;
+          if (activeCompactMultiSelect.contains(event.target)) return;
+          closeSelector(activeCompactMultiSelect);
+        });
+        compactMultiSelectOutsideClickBound = true;
+      }
+    }
+
     function getUniverseOptionsForCharacterForm() {
       return getUniverseOptionsForSelect({ includeUnassigned: false }).map((item) => item.name);
     }
@@ -5172,32 +5374,25 @@
     function submitNewCharacterForm(formEl) {
       const formData = new FormData(formEl);
       const characterName = String(formData.get('characterName') || '').trim();
-      const selectedUniverseId = String(formData.get('characterUniverseId') || '').trim();
       const rarity = String(formData.get('characterRarity') || 'Común');
-      const actorByNormalizedName = new Map(
-        (collectionModel.actors || [])
-          .map((actor) => String(actor?.name || '').trim())
+      const actorsInput = [...new Set(
+        formData.getAll('characterActors')
+          .map((value) => String(value || '').trim())
           .filter(Boolean)
-          .map((name) => [normalizeName(name), name])
-      );
-      const actorsInput = formData.getAll('characterActors')
-        .map(value => String(value || '').trim())
-        .filter(Boolean)
-        .map((name) => actorByNormalizedName.get(normalizeName(name)) || '')
-        .filter(Boolean);
+      )];
+      const selectedUniverses = [...new Set(
+        formData.getAll('characterUniverses')
+          .map((value) => String(value || '').trim())
+          .filter(Boolean)
+      )];
 
       if (!characterName) {
         state.draftCharacterFeedback = 'Debes ingresar el nombre del personaje.';
         renderIndiceView();
         return;
       }
-      if (!selectedUniverse) {
-        state.draftCharacterFeedback = 'Debes seleccionar un universo existente.';
-        renderIndiceView();
-        return;
-      }
-      if (actorId && !selectedActor) {
-        state.draftCharacterFeedback = 'Debes seleccionar un actor existente del catálogo.';
+      if (!selectedUniverses.length) {
+        state.draftCharacterFeedback = 'Debes seleccionar al menos un universo.';
         renderIndiceView();
         return;
       }
@@ -5209,12 +5404,12 @@
         return;
       }
 
-      if (!selectedActor) {
+      if (!actorsInput.length) {
         // Personaje sin actor
         VIDEOS.push({
           id: `video-${Date.now()}`,
           titulo: `Registro de ${characterName}`,
-          universo: [selectedUniverse.name],
+          universo: [...selectedUniverses],
           personaje: characterName,
           actor_de_doblaje: 'Sin actor',
           url_youtube: '',
@@ -5222,18 +5417,20 @@
           thumbnail: createPlaceholderCover(characterName)
         });
       } else {
-        // Personaje con actor existente en catálogo
-        VIDEOS.push({
-          id: `video-${Date.now()}`,
-          titulo: `Registro de ${characterName}`,
-          universo: [selectedUniverse.name],
-          personaje: characterName,
-          actor_de_doblaje: selectedActor.name,
-          url_youtube: '',
-          rareza: rarity,
-          thumbnail: createPlaceholderCover(characterName)
+        // Personaje con actores seleccionados
+        actorsInput.forEach((actorName, index) => {
+          VIDEOS.push({
+            id: `video-${Date.now()}-${index}`,
+            titulo: `Registro de ${characterName}`,
+            universo: [...selectedUniverses],
+            personaje: characterName,
+            actor_de_doblaje: actorName,
+            url_youtube: '',
+            rareza: rarity,
+            thumbnail: createPlaceholderCover(characterName)
+          });
+          blockCharacterForActor(actorName, characterName);
         });
-        blockCharacterForActor(selectedActor.name, characterName);
       }
 
       ensureUniverseNodes();
@@ -5241,6 +5438,7 @@
       refreshDependentViews();
 
       state.showAddCharacterForm = false;
+      state.draftCharacterActors = [];
       state.draftCharacterFeedback = 'Personaje agregado correctamente.';
       renderIndiceView();
       if (state.actorFocus) renderActoresView();
@@ -5496,15 +5694,25 @@
                     ${rarityOptions.map((option) => `<option value="${escapeHtml(option)}" ${option === rareza ? 'selected' : ''}>${escapeHtml(option)}</option>`).join('')}
                   </select>
                 </label>
-                <label>Actores (selección múltiple)
-                  <select name="characterActors" multiple size="${Math.max(3, Math.min(actorOptions.length || 3, 8))}">
-                    ${actorOptions.map((actorName) => `<option value="${escapeHtml(actorName)}" ${selectedActorsNormalized.has(normalizeName(actorName)) ? 'selected' : ''}>${escapeHtml(actorName)}</option>`).join('')}
-                  </select>
+                <label>Actores
+                  ${renderCompactMultiSelect({
+                    fieldName: 'characterActors',
+                    options: actorOptions,
+                    selectedValues: actorOptions.filter((name) => selectedActorsNormalized.has(normalizeName(name))),
+                    placeholder: 'Selecciona actores',
+                    emptyMessage: 'No hay actores disponibles.',
+                    addNewLabel: '＋ Nuevo actor'
+                  })}
                 </label>
-                <label>Universos (selección múltiple)
-                  <select name="characterUniverses" multiple size="${Math.max(3, Math.min(universeOptions.length || 3, 8))}">
-                    ${universeOptions.map((universeName) => `<option value="${escapeHtml(universeName)}" ${selectedUniversesNormalized.has(normalizeUniverseName(universeName)) ? 'selected' : ''}>${escapeHtml(universeName)}</option>`).join('')}
-                  </select>
+                <label>Universos
+                  ${renderCompactMultiSelect({
+                    fieldName: 'characterUniverses',
+                    options: universeOptions,
+                    selectedValues: universeOptions.filter((name) => selectedUniversesNormalized.has(normalizeUniverseName(name))),
+                    placeholder: 'Selecciona universos',
+                    emptyMessage: 'No hay universos disponibles.',
+                    addNewLabel: '＋ Nuevo universo'
+                  })}
                 </label>
                 <label>Avatar bloqueado (URL opcional)
                   <input type="text" name="lockedAvatarUrl" value="${customLockedAvatarUrl}" placeholder="https://...">
@@ -5514,7 +5722,7 @@
                 <button type="submit" class="neon-btn neon-btn--primary">Guardar cambios</button>
                 <button type="button" id="cancelCharacterEdit" class="neon-btn">Cancelar</button>
               </div>
-              <p class="muted">Tip: usa Ctrl/Cmd + clic para acumular varias opciones en actores y universos.</p>
+              <p class="muted">Selecciona un actor o universo y el selector se cerrará automáticamente. Haz clic en una etiqueta para quitarla.</p>
             </form>
             <section id="characterInlineDeletePanel" class="character-inline-editor" ${state.showCharacterInlineDelete ? '' : 'hidden'}>
               <p style="margin:0;">¿Seguro que deseas eliminar al personaje <strong>${focusedCharacter}</strong> por completo?</p>
@@ -5570,6 +5778,7 @@
           state.showCharacterInlineEdit = false;
           renderIndiceView();
         });
+        initializeCompactMultiSelects(viewIndice);
 
         document.getElementById('characterInlineEditForm')?.addEventListener('submit', (event) => {
           event.preventDefault();
@@ -5794,24 +6003,32 @@
                   <option value="Legendario">Legendario</option>
                 </select>
               </label>
-              <label>Actores de doblaje (opcional, selecciona uno o más)
-                <select name="characterActors" multiple ${characterActorOptions.length ? '' : 'disabled'}>
-                  ${characterActorOptions.map((actorName) => `<option value="${actorName}">${actorName}</option>`).join('')}
-                </select>
+              <label>Actores de doblaje (opcional)
+                ${renderCompactMultiSelect({
+                  fieldName: 'characterActors',
+                  options: characterActorOptions,
+                  selectedValues: state.draftCharacterActors,
+                  placeholder: 'Selecciona actores',
+                  emptyMessage: 'No hay actores disponibles.',
+                  addNewLabel: '＋ Nuevo actor'
+                })}
               </label>
-              <label>Universo (Obligatorio)
-                <input type="text" name="characterUniverseLabel" list="characterUniverseCatalog" placeholder="Busca un universo" required ${universeOptions.length ? '' : 'disabled'}>
-                <input type="hidden" name="characterUniverseId" ${universeOptions.length ? '' : 'disabled'}>
-                <datalist id="characterUniverseCatalog">
-                  ${universeOptions.map((item) => `<option value="${escapeHtml(item.name)}"></option>`).join('')}
-                </datalist>
+              <label>Universos (obligatorio)
+                ${renderCompactMultiSelect({
+                  fieldName: 'characterUniverses',
+                  options: universeOptions,
+                  selectedValues: [],
+                  placeholder: 'Selecciona universos',
+                  emptyMessage: 'No hay universos disponibles.',
+                  addNewLabel: '＋ Nuevo universo'
+                })}
               </label>
               <p id="addCharacterFeedback" class="inline-feedback" aria-live="polite">${state.draftCharacterFeedback || ''}</p>
               <div class="actions">
                 <button type="submit" class="neon-btn neon-btn--primary" ${universeOptions.length ? '' : 'disabled'}>Guardar personaje</button>
               </div>
               ${universeOptions.length ? '' : '<p class="muted">Primero debes crear al menos un universo para poder agregar personajes.</p>'}
-              ${characterActorOptions.length ? '<p class="muted">Mantén presionado Ctrl (o Cmd en Mac) para seleccionar varios actores.</p>' : '<p class="muted">No hay actores registrados. Se creará el personaje con "Sin actor".</p>'}
+              ${characterActorOptions.length ? '<p class="muted">Selecciona y agrega uno por uno. El selector se cierra automáticamente tras cada elección.</p>' : '<p class="muted">No hay actores registrados. Puedes crear uno desde “＋ Nuevo actor”.</p>'}
             </form>
           ` : ''}
           <div class="indice-filter-row">
@@ -5862,6 +6079,7 @@
       document.getElementById('toggleAddCharacterForm')?.addEventListener('click', () => {
         state.showAddCharacterForm = !state.showAddCharacterForm;
         state.draftCharacterFeedback = '';
+        if (!state.showAddCharacterForm) state.draftCharacterActors = [];
         renderIndiceView();
       });
       viewIndice.querySelectorAll('[data-toggle-rarity]').forEach((btn) => {
@@ -5881,21 +6099,7 @@
         submitNewCharacterForm(event.currentTarget);
       });
       if (state.showAddCharacterForm) {
-        const addCharacterForm = document.getElementById('addCharacterForm');
-        setupSearchableCatalogField({
-          formEl: addCharacterForm,
-          labelInputName: 'characterActorLabel',
-          hiddenInputName: 'characterActorId',
-          options: actorOptionsForCharacterForm,
-          required: false
-        });
-        setupSearchableCatalogField({
-          formEl: addCharacterForm,
-          labelInputName: 'characterUniverseLabel',
-          hiddenInputName: 'characterUniverseId',
-          options: universeOptions,
-          required: true
-        });
+        initializeCompactMultiSelects(viewIndice);
       }
       viewIndice.querySelectorAll('[data-open-character]').forEach((btn) => {
         btn.addEventListener('click', () => {

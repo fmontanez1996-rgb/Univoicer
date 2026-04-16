@@ -4408,25 +4408,7 @@
         changeView('actores');
       });
       modal.querySelector('#editVideo')?.addEventListener('click', () => {
-        const personajeNuevo = prompt('Nombre del personaje:', video.personaje || '');
-        if (personajeNuevo === null) return;
-        const actorNuevo = prompt('Actor de doblaje:', video.actor_de_doblaje || '');
-        if (actorNuevo === null) return;
-        const rarezaNueva = prompt('Rareza (Común, Raro, Épico, Legendario):', video.rareza || 'Común');
-        if (rarezaNueva === null) return;
-        const universosNuevos = prompt('Universos asociados (separados por coma):', getVideoUniverses(video).join(', '));
-        if (universosNuevos === null) return;
-        video.personaje = personajeNuevo.trim() || 'Sin personaje';
-        video.actor_de_doblaje = actorNuevo.trim() || 'Sin actor';
-        video.rareza = rarezasPermitidas(rarezaNueva);
-        video.universo = universosNuevos.split(',').map(u => u.trim()).filter(Boolean);
-        if (hasGreetingVideo(video)) unlockBlockedCharacterForActor(video.actor_de_doblaje, video.personaje);
-        else blockCharacterForActor(video.actor_de_doblaje, video.personaje);
-        ensureUniverseNodes();
-        saveVideos();
-        renderMapView();
-        renderUniverseView();
-        modal.remove();
+        openCharacterEditModal(video, modal);
       });
       modal.querySelector('#deleteVideo')?.addEventListener('click', () => {
         if (!confirm('¿Eliminar este personaje/video de la colección?')) return;
@@ -4437,6 +4419,140 @@
         renderUniverseView();
         modal.remove();
       });
+    }
+
+    function openCharacterEditModal(video, parentModal = null) {
+      const focusedCharacter = String(video?.personaje || '').trim() || 'Sin personaje';
+      const normalizedCharacter = normalizeName(focusedCharacter);
+      if (!normalizedCharacter) return;
+
+      const characterVideos = VIDEOS.filter((item) => normalizeName(item.personaje || '') === normalizedCharacter);
+      const currentRarity = characterVideos[0]?.rareza || 'Común';
+      const currentUniverses = getCharacterUniverseList(focusedCharacter, { fallbackToUnassigned: false });
+      const currentActors = [...new Set(characterVideos.map((item) => String(item.actor_de_doblaje || 'Sin actor').trim()).filter(Boolean))];
+      const rarityOptions = [...new Set([
+        ...VIDEOS
+          .map((item) => String(item.rareza || '').trim())
+          .filter(Boolean),
+        String(currentRarity || 'Común').trim() || 'Común'
+      ])].sort((a, b) => {
+        const rankDiff = rarityRank(b) - rarityRank(a);
+        if (rankDiff !== 0) return rankDiff;
+        return a.localeCompare(b, 'es', { sensitivity: 'base' });
+      });
+      const actorOptions = getActorOptionsForIndiceFilters();
+      const universeOptions = getUniverseOptionsForIndiceFilters();
+      const currentActorsNormalized = new Set(currentActors.map((actorName) => normalizeName(actorName)));
+      const currentUniversesNormalized = new Set(currentUniverses.map((universeName) => normalizeUniverseName(universeName)));
+
+      const editModal = document.createElement('section');
+      editModal.className = 'detail-modal';
+      editModal.innerHTML = `
+        <article class="detail-content">
+          <button class="detail-close neon-btn" id="closeCharacterEditor">✕ Cerrar</button>
+          <section class="hud-panel holo-card profile-layout">
+            <h3 class="section-title detail-character">Editar personaje</h3>
+            <form id="characterEditorFromDetail" class="character-inline-editor">
+              <div class="character-inline-editor__grid">
+                <label>Nombre del personaje
+                  <input type="text" name="characterName" value="${escapeHtml(focusedCharacter)}" required>
+                </label>
+                <label>Rareza
+                  <select name="characterRarity">
+                    ${rarityOptions.map((option) => `<option value="${escapeHtml(option)}" ${option === currentRarity ? 'selected' : ''}>${escapeHtml(option)}</option>`).join('')}
+                  </select>
+                </label>
+                <label>Actores (selección múltiple)
+                  <select name="characterActors" multiple size="${Math.max(3, Math.min(actorOptions.length || 3, 8))}">
+                    ${actorOptions.map((actorName) => `<option value="${escapeHtml(actorName)}" ${currentActorsNormalized.has(normalizeName(actorName)) ? 'selected' : ''}>${escapeHtml(actorName)}</option>`).join('')}
+                  </select>
+                </label>
+                <label>Universos (selección múltiple)
+                  <select name="characterUniverses" multiple size="${Math.max(3, Math.min(universeOptions.length || 3, 8))}">
+                    ${universeOptions.map((universeName) => `<option value="${escapeHtml(universeName)}" ${currentUniversesNormalized.has(normalizeUniverseName(universeName)) ? 'selected' : ''}>${escapeHtml(universeName)}</option>`).join('')}
+                  </select>
+                </label>
+              </div>
+              <div class="character-inline-editor__actions">
+                <button type="submit" class="neon-btn neon-btn--primary">Guardar cambios</button>
+                <button type="button" id="cancelCharacterEditor" class="neon-btn">Cancelar</button>
+              </div>
+              <p class="muted">Tip: usa Ctrl/Cmd + clic para seleccionar varios actores y universos.</p>
+            </form>
+          </section>
+        </article>
+      `;
+
+      const closeEditor = () => editModal.remove();
+      editModal.addEventListener('click', (event) => {
+        if (event.target === editModal) closeEditor();
+      });
+      editModal.querySelector('#closeCharacterEditor')?.addEventListener('click', closeEditor);
+      editModal.querySelector('#cancelCharacterEditor')?.addEventListener('click', closeEditor);
+      editModal.querySelector('#characterEditorFromDetail')?.addEventListener('submit', (event) => {
+        event.preventDefault();
+        const formData = new FormData(event.currentTarget);
+        const nextCharacterName = String(formData.get('characterName') || '').trim();
+        const nextRarity = String(formData.get('characterRarity') || '').trim() || 'Común';
+        const nextActors = [...new Set(
+          formData.getAll('characterActors').map((item) => String(item || '').trim()).filter(Boolean)
+        )];
+        const nextUniverses = [...new Set(
+          formData.getAll('characterUniverses').map((item) => String(item || '').trim()).filter(Boolean)
+        )];
+        if (!nextCharacterName) return;
+
+        const { canonicalName, canonicalRarity, canonicalUniverses } = updateCharacterMetadata(focusedCharacter, {
+          nextCharacterName,
+          nextRarity,
+          nextUniverses
+        });
+
+        const previousActors = [...new Set(characterVideos.map((item) => String(item.actor_de_doblaje || 'Sin actor').trim()).filter(Boolean))];
+        const previousByNormalized = new Map(previousActors.map((name) => [normalizeName(name), name]));
+        const nextByNormalized = new Map(nextActors.map((name) => [normalizeName(name), name]));
+        const removedActors = [...previousByNormalized.entries()]
+          .filter(([normalizedName]) => !nextByNormalized.has(normalizedName))
+          .map(([, name]) => name);
+        const addedActors = [...nextByNormalized.entries()]
+          .filter(([normalizedName]) => !previousByNormalized.has(normalizedName))
+          .map(([, name]) => name);
+
+        for (let i = VIDEOS.length - 1; i >= 0; i--) {
+          const entry = VIDEOS[i];
+          if (normalizeName(entry.personaje || '') !== normalizeName(canonicalName)) continue;
+          if (removedActors.some((actorName) => normalizeName(actorName) === normalizeName(entry.actor_de_doblaje))) {
+            VIDEOS.splice(i, 1);
+          }
+        }
+        removedActors.forEach((actorName) => {
+          if (state.blockedCharactersByActor[actorName]) {
+            state.blockedCharactersByActor[actorName] = state.blockedCharactersByActor[actorName]
+              .filter((name) => normalizeName(name) !== normalizeName(canonicalName));
+          }
+        });
+        addedActors.forEach((actorName) => {
+          VIDEOS.push({
+            id: `video-${Date.now()}-${Math.random()}`,
+            titulo: `Registro de ${canonicalName}`,
+            universo: [...canonicalUniverses],
+            personaje: canonicalName,
+            actor_de_doblaje: actorName,
+            url_youtube: '',
+            rareza: canonicalRarity,
+            thumbnail: createPlaceholderCover(canonicalName)
+          });
+          blockCharacterForActor(actorName, canonicalName);
+        });
+
+        saveBlockedCharacters();
+        saveVideos();
+        refreshDependentViews();
+        if (state.view === 'indice') renderIndiceView();
+        closeEditor();
+        if (parentModal) parentModal.remove();
+      });
+      document.body.appendChild(editModal);
     }
 
     function openCharacterProfile(characterName) {

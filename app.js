@@ -4877,8 +4877,17 @@
       const characterName = String(formData.get('characterName') || '').trim();
       const selectedUniverse = String(formData.get('characterUniverse') || '').trim();
       const rarity = String(formData.get('characterRarity') || 'Común');
-      const rawActors = String(formData.get('characterActors') || '').trim();
-      const actorsInput = rawActors ? rawActors.split(',').map(s=>s.trim()).filter(Boolean) : [];
+      const actorByNormalizedName = new Map(
+        (collectionModel.actors || [])
+          .map((actor) => String(actor?.name || '').trim())
+          .filter(Boolean)
+          .map((name) => [normalizeName(name), name])
+      );
+      const actorsInput = formData.getAll('characterActors')
+        .map(value => String(value || '').trim())
+        .filter(Boolean)
+        .map((name) => actorByNormalizedName.get(normalizeName(name)) || '')
+        .filter(Boolean);
 
       if (!characterName) {
         state.draftCharacterFeedback = 'Debes ingresar el nombre del personaje.';
@@ -5424,6 +5433,11 @@
       // ----------------------------------------------------------------------------------
       const indexItems = getCharactersForIndice(state.indiceSearch);
       const universeOptions = getUniverseOptionsForCharacterForm();
+      const characterActorOptions = [...new Set(
+        (collectionModel.actors || [])
+          .map((actor) => String(actor?.name || '').trim())
+          .filter((name) => Boolean(name) && normalizeName(name) !== normalizeName('Sin actor'))
+      )].sort((a, b) => a.localeCompare(b, 'es', { sensitivity: 'base' }));
       const indexUniverseFilters = getUniverseOptionsForIndiceFilters();
       const indexActorFilters = getActorOptionsForIndiceFilters();
       const rarityGroupLabels = {
@@ -5458,8 +5472,10 @@
                   <option value="Legendario">Legendario</option>
                 </select>
               </label>
-              <label>Actores de doblaje (opcional, separados por coma)
-                <input type="text" name="characterActors" placeholder="Ej. Humberto Vélez, Víctor Manuel Espinoza">
+              <label>Actores de doblaje (opcional, selecciona uno o más)
+                <select name="characterActors" multiple ${characterActorOptions.length ? '' : 'disabled'}>
+                  ${characterActorOptions.map((actorName) => `<option value="${actorName}">${actorName}</option>`).join('')}
+                </select>
               </label>
               <label>Universo (Obligatorio)
                 <select name="characterUniverse" required ${universeOptions.length ? '' : 'disabled'}>
@@ -5472,6 +5488,7 @@
                 <button type="submit" class="neon-btn neon-btn--primary" ${universeOptions.length ? '' : 'disabled'}>Guardar personaje</button>
               </div>
               ${universeOptions.length ? '' : '<p class="muted">Primero debes crear al menos un universo para poder agregar personajes.</p>'}
+              ${characterActorOptions.length ? '<p class="muted">Mantén presionado Ctrl (o Cmd en Mac) para seleccionar varios actores.</p>' : '<p class="muted">No hay actores registrados. Se creará el personaje con "Sin actor".</p>'}
             </form>
           ` : ''}
           <div class="indice-filter-row">

@@ -3689,6 +3689,11 @@
         return acc;
       }, {});
       const defaultActorsForVideo = getActorsForUniverseCharacter(defaultCharacterForVideo);
+      const collectionActors = [...new Set(
+        (collectionModel.actors || [])
+          .map((actor) => String(actor?.name || '').trim())
+          .filter(Boolean)
+      )].sort((a, b) => a.localeCompare(b, 'es', { sensitivity: 'base' }));
       const filtered = getFilteredUniverseVideos().filter((video) => {
         const personaje = (video.personaje || '').toLowerCase();
         const actor = (video.actor_de_doblaje || '').toLowerCase();
@@ -3859,7 +3864,11 @@
               </select>
             </label>
             <label>Actores de doblaje (Opcional)
-              <input type="text" name="actor_de_doblaje" placeholder="Ej. Mario Castañeda, Laura Torres">
+              <select name="actor_de_doblaje" multiple size="${Math.max(4, Math.min(collectionActors.length + 1, 8))}">
+                <option value="Sin actor">Sin actor</option>
+                ${collectionActors.map(actorName => `<option value="${actorName}">${actorName}</option>`).join('')}
+              </select>
+              <small class="muted">Selecciona uno o más actores existentes.</small>
             </label>
             <label>URL de YouTube (Opcional)
               <input type="url" name="url_youtube" placeholder="https://www.youtube.com/watch?v=...">
@@ -4110,6 +4119,9 @@
         const formData = new FormData(addVideoForm);
         const characterName = String(formData.get('personaje') || '').trim();
         const actorName = String(formData.get('actor_de_doblaje') || '').trim();
+        const selectedActors = formData.getAll('actor_de_doblaje')
+          .map((value) => String(value || '').trim())
+          .filter(Boolean);
         if (state.universeAddMode === 'character') {
           if (!characterName) {
             if (feedback) feedback.textContent = 'Debes completar el nombre del personaje.';
@@ -4124,8 +4136,8 @@
             return;
           }
           const metadata = normalizedUrl ? await fetchYoutubeMetadata(normalizedUrl) : null;
-          const actorList = actorName
-            ? [...new Set(actorName.split(',').map(item => item.trim()).filter(Boolean))]
+          const actorList = selectedActors.length
+            ? [...new Set(selectedActors)]
             : ['Sin actor'];
           const normalizedCharacterName = normalizeName(characterName);
           const actorListToCreate = actorList.filter((actorItem) => {

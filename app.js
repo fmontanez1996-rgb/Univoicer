@@ -4749,7 +4749,7 @@
     }) {
       const previousNormalized = normalizeName(currentCharacterName || '');
       const canonicalName = String(nextCharacterName || '').trim();
-      const canonicalRarity = rarezasPermitidas(nextRarity || 'Común');
+      const canonicalRarity = String(nextRarity || '').trim() || 'Común';
       const canonicalUniverses = normalizeUniverseList(nextUniverses, { fallbackToUnassigned: true });
 
       VIDEOS.forEach((video) => {
@@ -5368,7 +5368,7 @@
                   <input type="text" name="characterUniverses" value="${universos.join(', ')}">
                 </label>
                 <label>Avatar bloqueado (URL opcional)
-                  <input type="url" name="lockedAvatarUrl" value="${customLockedAvatarUrl}" placeholder="https://...">
+                  <input type="text" name="lockedAvatarUrl" value="${customLockedAvatarUrl}" placeholder="https://...">
                 </label>
               </div>
               <div class="character-inline-editor__actions">
@@ -5439,7 +5439,7 @@
           const newActorsRaw = String(formData.get('characterActors') || '');
           const newUniversesRaw = String(formData.get('characterUniverses') || '');
           const lockedAvatarUrl = String(formData.get('lockedAvatarUrl') || '').trim();
-          if (!newName || !newRarity) return;
+          if (!newName) return;
 
           const newActorsList = [...new Set(newActorsRaw.split(',').map(s => s.trim()).filter(Boolean))];
           const parsedUniverses = newUniversesRaw.split(',').map(s => s.trim()).filter(Boolean);

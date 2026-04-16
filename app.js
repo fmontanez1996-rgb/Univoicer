@@ -3689,6 +3689,8 @@
         return acc;
       }, {});
       const defaultActorsForVideo = getActorsForUniverseCharacter(defaultCharacterForVideo);
+      const characterOptionsForVideo = getCharacterOptionsForSelect({ universeName: state.universe });
+      const actorOptionsForCharacterMode = getActorOptionsForSelect({ universeName: state.universe });
       const filtered = getFilteredUniverseVideos().filter((video) => {
         const personaje = (video.personaje || '').toLowerCase();
         const actor = (video.actor_de_doblaje || '').toLowerCase();
@@ -3838,16 +3840,18 @@
               <input type="url" name="url_youtube" required placeholder="https://www.youtube.com/watch?v=...">
             </label>
             <label>Personaje (Requerido)
-              <select name="personaje" required ${universeCharacters.length ? '' : 'disabled'}>
-                ${universeCharacters.length
-                  ? universeCharacters.map(name => `<option value="${name}">${name}</option>`).join('')
-                  : '<option value="">No hay personajes en este universo</option>'}
-              </select>
+              <input type="text" name="personaje_label" list="videoCharacterCatalog" placeholder="Busca un personaje" required ${universeCharacters.length ? '' : 'disabled'}>
+              <input type="hidden" name="personaje" ${universeCharacters.length ? '' : 'disabled'}>
+              <datalist id="videoCharacterCatalog">
+                ${characterOptionsForVideo.map((item) => `<option value="${escapeHtml(item.name)}"></option>`).join('')}
+              </datalist>
             </label>
             <label>Actor de doblaje (Requerido)
-              <select name="actor_de_doblaje" required ${universeCharacters.length ? '' : 'disabled'}>
-                ${defaultActorsForVideo.map(actorName => `<option value="${actorName}">${actorName}</option>`).join('')}
-              </select>
+              <input type="text" name="actor_de_doblaje_label" list="videoActorCatalog" placeholder="Busca un actor" required ${universeCharacters.length ? '' : 'disabled'}>
+              <input type="hidden" name="actor_de_doblaje" ${universeCharacters.length ? '' : 'disabled'}>
+              <datalist id="videoActorCatalog">
+                ${defaultActorsForVideo.map((actorName) => `<option value="${escapeHtml(actorName)}"></option>`).join('')}
+              </datalist>
             </label>
           ` : `
             <label>Nombre del Personaje (Requerido)
@@ -3858,8 +3862,12 @@
                 ${rarezas.map(r => `<option value="${r}">${r}</option>`).join('')}
               </select>
             </label>
-            <label>Actores de doblaje (Opcional)
-              <input type="text" name="actor_de_doblaje" placeholder="Ej. Mario Castañeda, Laura Torres">
+            <label>Actor de doblaje (Opcional)
+              <input type="text" name="actor_de_doblaje_label" list="videoActorCatalogCharacterMode" placeholder="Busca un actor del catálogo">
+              <input type="hidden" name="actor_de_doblaje">
+              <datalist id="videoActorCatalogCharacterMode">
+                ${actorOptionsForCharacterMode.map((item) => `<option value="${escapeHtml(item.name)}"></option>`).join('')}
+              </datalist>
             </label>
             <label>URL de YouTube (Opcional)
               <input type="url" name="url_youtube" placeholder="https://www.youtube.com/watch?v=...">
@@ -3914,8 +3922,8 @@
       const btnToggleVideo = document.getElementById('btn-toggle-video');
       const btnAddBlockedCharacter = document.getElementById('btn-add-blocked-character');
       const formAgregarVideo = document.getElementById('form-agregar-video');
-      const videoCharacterSelect = formAgregarVideo?.querySelector('[name="personaje"]');
-      const videoActorSelect = formAgregarVideo?.querySelector('[name="actor_de_doblaje"]');
+      const videoCharacterInput = formAgregarVideo?.querySelector('[name="personaje_label"]');
+      const videoActorCatalog = formAgregarVideo?.querySelector('#videoActorCatalog');
       btnToggleVideo?.addEventListener('click', () => {
         if (state.showAddForm && state.universeAddMode === 'video') {
           state.showAddForm = false;
@@ -3936,15 +3944,44 @@
         renderUniverseView();
         if (state.showAddForm) document.getElementById('form-agregar-video')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
       });
-      const syncVideoActorOptions = () => {
-        if (!videoCharacterSelect || !videoActorSelect || state.universeAddMode !== 'video') return;
-        const selectedCharacter = String(videoCharacterSelect.value || '');
-        const actors = characterActorsMap[selectedCharacter] || [];
-        videoActorSelect.innerHTML = actors.map(actorName => `<option value="${actorName}">${actorName}</option>`).join('')
-          || '<option value="">Sin actores asociados</option>';
-      };
-      videoCharacterSelect?.addEventListener('change', syncVideoActorOptions);
-      syncVideoActorOptions();
+      if (state.universeAddMode === 'video') {
+        setupSearchableCatalogField({
+          formEl: formAgregarVideo,
+          labelInputName: 'personaje_label',
+          hiddenInputName: 'personaje',
+          options: characterOptionsForVideo,
+          required: true
+        });
+        const characterOptionsByNormalizedName = new Map(
+          characterOptionsForVideo.map((item) => [normalizeName(item.name), item])
+        );
+        const syncVideoActorOptions = () => {
+          if (!videoCharacterInput || !videoActorCatalog) return;
+          const selectedCharacterName = characterOptionsByNormalizedName.get(normalizeName(videoCharacterInput.value || ''))?.name || '';
+          const actorOptionsForVideoMode = getActorOptionsForSelect({ characterName: selectedCharacterName, universeName: state.universe });
+          videoActorCatalog.innerHTML = actorOptionsForVideoMode
+            .map((item) => `<option value="${escapeHtml(item.name)}"></option>`)
+            .join('');
+          setupSearchableCatalogField({
+            formEl: formAgregarVideo,
+            labelInputName: 'actor_de_doblaje_label',
+            hiddenInputName: 'actor_de_doblaje',
+            options: actorOptionsForVideoMode,
+            required: true
+          });
+        };
+        videoCharacterInput?.addEventListener('input', syncVideoActorOptions);
+        videoCharacterInput?.addEventListener('change', syncVideoActorOptions);
+        syncVideoActorOptions();
+      } else {
+        setupSearchableCatalogField({
+          formEl: formAgregarVideo,
+          labelInputName: 'actor_de_doblaje_label',
+          hiddenInputName: 'actor_de_doblaje',
+          options: actorOptionsForCharacterMode,
+          required: false
+        });
+      }
       const toggleEditUniverseFormBtn = document.getElementById('toggleEditUniverseForm');
       toggleEditUniverseFormBtn?.addEventListener('click', () => {
         state.showEditUniverseForm = !state.showEditUniverseForm;
@@ -4124,8 +4161,13 @@
             return;
           }
           const metadata = normalizedUrl ? await fetchYoutubeMetadata(normalizedUrl) : null;
+          const actorOptions = getActorOptionsForSelect({ universeName: state.universe });
+          if (actorName && !findCatalogOptionById(actorOptions, actorName)) {
+            if (feedback) feedback.textContent = 'Selecciona un actor existente del catálogo.';
+            return;
+          }
           const actorList = actorName
-            ? [...new Set(actorName.split(',').map(item => item.trim()).filter(Boolean))]
+            ? [findCatalogOptionById(actorOptions, actorName)?.name].filter(Boolean)
             : ['Sin actor'];
           const normalizedCharacterName = normalizeName(characterName);
           const actorListToCreate = actorList.filter((actorItem) => {
@@ -4179,6 +4221,18 @@
           if (feedback) feedback.textContent = 'Debes elegir un personaje de este universo.';
           return;
         }
+        const characterOptions = getCharacterOptionsForSelect({ universeName: state.universe });
+        const selectedCharacterOption = findCatalogOptionById(characterOptions, characterName);
+        if (!selectedCharacterOption) {
+          if (feedback) feedback.textContent = 'Selecciona un personaje existente del catálogo.';
+          return;
+        }
+        const actorOptions = getActorOptionsForSelect({ characterName: selectedCharacterOption.name, universeName: state.universe });
+        const selectedActorOption = findCatalogOptionById(actorOptions, actorName);
+        if (!selectedActorOption) {
+          if (feedback) feedback.textContent = 'Selecciona un actor existente del catálogo.';
+          return;
+        }
         const urlInput = String(formData.get('url_youtube') || '').trim();
         const normalizedUrl = normalizeYoutubeUrl(urlInput);
         if (!normalizedUrl) {
@@ -4190,8 +4244,8 @@
         const newVideo = {
           id: `video-${Date.now()}`,
           universo: [state.universe],
-          personaje: characterName || 'Sin personaje',
-          actor_de_doblaje: actorName || 'Sin actor',
+          personaje: selectedCharacterOption.name || 'Sin personaje',
+          actor_de_doblaje: selectedActorOption.name || 'Sin actor',
           url_youtube: normalizedUrl,
           thumbnail: metadata.thumbnail,
           titulo: metadata.title,
@@ -4803,21 +4857,167 @@
         });
     }
 
-    function getUniverseOptionsForCharacterForm() {
-      const universeByNormalizedName = new Map();
-      const unassignedKey = normalizeUniverseName(SPECIAL_UNASSIGNED_UNIVERSE);
-      const registerUniverse = (rawName, { preferExisting = false } = {}) => {
+    function collectCatalogOptions({
+      items = [],
+      idPrefix = 'item',
+      normalizeFn = normalizeEntityName,
+      skipFn = null
+    } = {}) {
+      const optionByNormalizedName = new Map();
+      items.forEach((item) => {
+        const rawName = typeof item === 'string' ? item : item?.name;
         const canonicalName = String(rawName || '').trim();
-        const normalizedName = normalizeUniverseName(canonicalName);
-        if (!normalizedName || normalizedName === unassignedKey) return;
-        if (!universeByNormalizedName.has(normalizedName) || preferExisting) {
-          universeByNormalizedName.set(normalizedName, canonicalName);
+        const normalizedName = normalizeFn(canonicalName);
+        if (!normalizedName) return;
+        if (skipFn && skipFn(canonicalName, normalizedName)) return;
+        if (optionByNormalizedName.has(normalizedName)) return;
+        const itemId = String((typeof item === 'object' && item?.id) || createModelId(idPrefix, normalizedName));
+        optionByNormalizedName.set(normalizedName, { id: itemId, name: canonicalName, normalizedName });
+      });
+      return [...optionByNormalizedName.values()]
+        .sort((a, b) => a.name.localeCompare(b.name, 'es', { sensitivity: 'base' }));
+    }
+
+    function getActorOptionsForSelect({ characterName = '', universeName = '' } = {}) {
+      const normalizedCharacter = normalizeName(characterName || '');
+      const normalizedUniverse = normalizeUniverseName(universeName || '');
+      const hasCharacterFilter = Boolean(normalizedCharacter);
+      const actorByNormalizedName = new Map(
+        (collectionModel.actors || [])
+          .map((actor) => [normalizeName(actor.name), actor])
+      );
+      const scopedActorNames = [];
+
+      VIDEOS.forEach((video) => {
+        const videoCharacter = normalizeName(video.personaje || '');
+        const videoUniverseMatch = !normalizedUniverse || getVideoUniverses(video)
+          .some((name) => normalizeUniverseName(name) === normalizedUniverse);
+        if (hasCharacterFilter && videoCharacter !== normalizedCharacter) return;
+        if (!videoUniverseMatch) return;
+        scopedActorNames.push(video.actor_de_doblaje);
+      });
+
+      if (!scopedActorNames.length && hasCharacterFilter) {
+        const character = (collectionModel.characters || [])
+          .find((item) => normalizeName(item.name) === normalizedCharacter);
+        if (character) {
+          character.actorIds
+            .map((actorId) => collectionModel.actors.find((actor) => actor.id === actorId)?.name)
+            .filter(Boolean)
+            .forEach((name) => scopedActorNames.push(name));
         }
+      }
+
+      const sourceItems = scopedActorNames.length
+        ? scopedActorNames.map((name) => {
+          const existingActor = actorByNormalizedName.get(normalizeName(name || ''));
+          return existingActor || { id: createModelId('actor', normalizeName(name || 'sin-actor')), name };
+        })
+        : [
+          ...(collectionModel.actors || []),
+          ...Object.keys(state.blockedCharactersByActor || {}).map((name) => {
+            const existingActor = actorByNormalizedName.get(normalizeName(name || ''));
+            return existingActor || { id: createModelId('actor', normalizeName(name || 'sin-actor')), name };
+          })
+        ];
+
+      return collectCatalogOptions({
+        items: sourceItems,
+        idPrefix: 'actor',
+        normalizeFn: normalizeName
+      });
+    }
+
+    function getUniverseOptionsForSelect({ includeUnassigned = false } = {}) {
+      const unassignedKey = normalizeUniverseName(SPECIAL_UNASSIGNED_UNIVERSE);
+      const modelUniverseByNormalizedName = new Map(
+        (collectionModel.universes || []).map((universe) => [normalizeUniverseName(universe.name), universe])
+      );
+      const sourceUniverses = [
+        ...(collectionModel.universes || []),
+        ...state.universeNodes.map((node) => {
+          const normalized = normalizeUniverseName(node.name);
+          return modelUniverseByNormalizedName.get(normalized) || {
+            id: createModelId('universe', normalized),
+            name: String(node.name || '').trim()
+          };
+        })
+      ];
+      return collectCatalogOptions({
+        items: sourceUniverses,
+        idPrefix: 'universe',
+        normalizeFn: normalizeUniverseName,
+        skipFn: (_, normalizedName) => !includeUnassigned && normalizedName === unassignedKey
+      });
+    }
+
+    function getCharacterOptionsForSelect({ universeName = '' } = {}) {
+      const normalizedUniverse = normalizeUniverseName(universeName || '');
+      const modelUniverseByNormalizedName = new Map(
+        (collectionModel.universes || []).map((universe) => [normalizeUniverseName(universe.name), universe])
+      );
+      const universeFromModel = modelUniverseByNormalizedName.get(normalizedUniverse);
+      const modelCharacters = (collectionModel.characters || [])
+        .filter((character) => {
+          if (!normalizedUniverse) return true;
+          return character.universeIds.includes(universeFromModel?.id || '');
+        });
+      const charactersFromVideos = VIDEOS
+        .filter((video) => getVideoUniverses(video).some((name) => normalizeUniverseName(name) === normalizedUniverse))
+        .map((video) => {
+          const normalizedCharacter = normalizeName(video.personaje || '');
+          const existing = (collectionModel.characters || []).find((character) => normalizeName(character.name) === normalizedCharacter);
+          return existing || { id: createModelId('character', normalizedCharacter), name: video.personaje };
+        });
+      return collectCatalogOptions({
+        items: [...modelCharacters, ...charactersFromVideos],
+        idPrefix: 'character',
+        normalizeFn: normalizeName
+      });
+    }
+
+    function findCatalogOptionById(options, optionId) {
+      const cleanId = String(optionId || '').trim();
+      if (!cleanId) return null;
+      return options.find((item) => item.id === cleanId) || null;
+    }
+
+    function setupSearchableCatalogField({
+      formEl,
+      labelInputName,
+      hiddenInputName,
+      options,
+      required = false
+    }) {
+      const labelInput = formEl?.querySelector(`[name="${labelInputName}"]`);
+      const hiddenInput = formEl?.querySelector(`[name="${hiddenInputName}"]`);
+      if (!labelInput || !hiddenInput) return;
+      const optionByNormalizedName = new Map(options.map((option) => [normalizeEntityName(option.name), option]));
+      const syncSelection = () => {
+        const typedValue = String(labelInput.value || '').trim();
+        if (!typedValue) {
+          hiddenInput.value = '';
+          labelInput.setCustomValidity(required ? 'Selecciona un valor del catálogo.' : '');
+          return;
+        }
+        const option = optionByNormalizedName.get(normalizeEntityName(typedValue));
+        if (!option) {
+          hiddenInput.value = '';
+          labelInput.setCustomValidity('Selecciona un valor existente del catálogo.');
+          return;
+        }
+        hiddenInput.value = option.id;
+        labelInput.value = option.name;
+        labelInput.setCustomValidity('');
       };
-      state.universeNodes.forEach((node) => registerUniverse(node.name, { preferExisting: true }));
-      Object.values(groupByUniverse()).forEach((universe) => registerUniverse(universe.name));
-      return [...universeByNormalizedName.values()]
-        .sort((a, b) => a.localeCompare(b, 'es', { sensitivity: 'base' }));
+      labelInput.addEventListener('input', syncSelection);
+      labelInput.addEventListener('change', syncSelection);
+      labelInput.addEventListener('blur', syncSelection);
+      syncSelection();
+    }
+
+    function getUniverseOptionsForCharacterForm() {
+      return getUniverseOptionsForSelect({ includeUnassigned: false }).map((item) => item.name);
     }
 
     function getUniverseOptionsForIndiceFilters() {
@@ -4835,17 +5035,7 @@
     }
 
     function getActorOptionsForIndiceFilters() {
-      const actorByNormalizedName = new Map();
-      const registerActor = (rawName) => {
-        const canonicalName = String(rawName || '').trim();
-        const normalizedName = normalizeName(canonicalName);
-        if (!normalizedName) return;
-        if (!actorByNormalizedName.has(normalizedName)) actorByNormalizedName.set(normalizedName, canonicalName);
-      };
-      (collectionModel.actors || []).forEach((actor) => registerActor(actor.name));
-      VIDEOS.forEach((video) => registerActor(video.actor_de_doblaje));
-      Object.keys(state.blockedCharactersByActor || {}).forEach(registerActor);
-      return [...actorByNormalizedName.values()].sort((a, b) => a.localeCompare(b, 'es', { sensitivity: 'base' }));
+      return getActorOptionsForSelect().map((item) => item.name);
     }
 
     function addDraftActorFromInput(rawName) {
@@ -4863,10 +5053,13 @@
     function submitNewCharacterForm(formEl) {
       const formData = new FormData(formEl);
       const characterName = String(formData.get('characterName') || '').trim();
-      const selectedUniverse = String(formData.get('characterUniverse') || '').trim();
+      const selectedUniverseId = String(formData.get('characterUniverseId') || '').trim();
       const rarity = String(formData.get('characterRarity') || 'Común');
-      const rawActors = String(formData.get('characterActors') || '').trim();
-      const actorsInput = rawActors ? rawActors.split(',').map(s=>s.trim()).filter(Boolean) : [];
+      const actorId = String(formData.get('characterActorId') || '').trim();
+      const universeOptions = getUniverseOptionsForSelect({ includeUnassigned: false });
+      const selectedUniverse = findCatalogOptionById(universeOptions, selectedUniverseId);
+      const actorOptions = getActorOptionsForSelect();
+      const selectedActor = actorId ? findCatalogOptionById(actorOptions, actorId) : null;
 
       if (!characterName) {
         state.draftCharacterFeedback = 'Debes ingresar el nombre del personaje.';
@@ -4878,6 +5071,11 @@
         renderIndiceView();
         return;
       }
+      if (actorId && !selectedActor) {
+        state.draftCharacterFeedback = 'Debes seleccionar un actor existente del catálogo.';
+        renderIndiceView();
+        return;
+      }
       const normalizedCharacter = normalizeName(characterName);
       const alreadyExists = VIDEOS.some(video => normalizeName(video.personaje || '') === normalizedCharacter);
       if (alreadyExists) {
@@ -4886,12 +5084,12 @@
         return;
       }
 
-      if (actorsInput.length === 0) {
+      if (!selectedActor) {
         // Personaje sin actor
         VIDEOS.push({
           id: `video-${Date.now()}`,
           titulo: `Registro de ${characterName}`,
-          universo: [selectedUniverse],
+          universo: [selectedUniverse.name],
           personaje: characterName,
           actor_de_doblaje: 'Sin actor',
           url_youtube: '',
@@ -4899,20 +5097,18 @@
           thumbnail: createPlaceholderCover(characterName)
         });
       } else {
-        // Personaje con actores, autovincular
-        actorsInput.forEach((actorName, idx) => {
-          VIDEOS.push({
-            id: `video-${Date.now()}-${idx}`,
-            titulo: `Registro de ${characterName}`,
-            universo: [selectedUniverse],
-            personaje: characterName,
-            actor_de_doblaje: actorName,
-            url_youtube: '',
-            rareza: rarity,
-            thumbnail: createPlaceholderCover(characterName)
-          });
-          blockCharacterForActor(actorName, characterName);
+        // Personaje con actor existente en catálogo
+        VIDEOS.push({
+          id: `video-${Date.now()}`,
+          titulo: `Registro de ${characterName}`,
+          universo: [selectedUniverse.name],
+          personaje: characterName,
+          actor_de_doblaje: selectedActor.name,
+          url_youtube: '',
+          rareza: rarity,
+          thumbnail: createPlaceholderCover(characterName)
         });
+        blockCharacterForActor(selectedActor.name, characterName);
       }
 
       ensureUniverseNodes();
@@ -5411,7 +5607,8 @@
       // VISTA DE GALERÍA DE ÍNDICE (Cuando no hay personaje enfocado)
       // ----------------------------------------------------------------------------------
       const indexItems = getCharactersForIndice(state.indiceSearch);
-      const universeOptions = getUniverseOptionsForCharacterForm();
+      const universeOptions = getUniverseOptionsForSelect({ includeUnassigned: false });
+      const actorOptionsForCharacterForm = getActorOptionsForSelect();
       const indexUniverseFilters = getUniverseOptionsForIndiceFilters();
       const indexActorFilters = getActorOptionsForIndiceFilters();
       const rarityGroupLabels = {
@@ -5446,14 +5643,19 @@
                   <option value="Legendario">Legendario</option>
                 </select>
               </label>
-              <label>Actores de doblaje (opcional, separados por coma)
-                <input type="text" name="characterActors" placeholder="Ej. Humberto Vélez, Víctor Manuel Espinoza">
+              <label>Actor de doblaje (opcional)
+                <input type="text" name="characterActorLabel" list="characterActorCatalog" placeholder="Busca un actor del catálogo">
+                <input type="hidden" name="characterActorId">
+                <datalist id="characterActorCatalog">
+                  ${actorOptionsForCharacterForm.map((item) => `<option value="${escapeHtml(item.name)}"></option>`).join('')}
+                </datalist>
               </label>
               <label>Universo (Obligatorio)
-                <select name="characterUniverse" required ${universeOptions.length ? '' : 'disabled'}>
-                  <option value="">Selecciona un universo</option>
-                  ${universeOptions.map((name) => `<option value="${name}">${name}</option>`).join('')}
-                </select>
+                <input type="text" name="characterUniverseLabel" list="characterUniverseCatalog" placeholder="Busca un universo" required ${universeOptions.length ? '' : 'disabled'}>
+                <input type="hidden" name="characterUniverseId" ${universeOptions.length ? '' : 'disabled'}>
+                <datalist id="characterUniverseCatalog">
+                  ${universeOptions.map((item) => `<option value="${escapeHtml(item.name)}"></option>`).join('')}
+                </datalist>
               </label>
               <p id="addCharacterFeedback" class="inline-feedback" aria-live="polite">${state.draftCharacterFeedback || ''}</p>
               <div class="actions">
@@ -5528,6 +5730,23 @@
         event.preventDefault();
         submitNewCharacterForm(event.currentTarget);
       });
+      if (state.showAddCharacterForm) {
+        const addCharacterForm = document.getElementById('addCharacterForm');
+        setupSearchableCatalogField({
+          formEl: addCharacterForm,
+          labelInputName: 'characterActorLabel',
+          hiddenInputName: 'characterActorId',
+          options: actorOptionsForCharacterForm,
+          required: false
+        });
+        setupSearchableCatalogField({
+          formEl: addCharacterForm,
+          labelInputName: 'characterUniverseLabel',
+          hiddenInputName: 'characterUniverseId',
+          options: universeOptions,
+          required: true
+        });
+      }
       viewIndice.querySelectorAll('[data-open-character]').forEach((btn) => {
         btn.addEventListener('click', () => {
           state.indiceCharacterFocus = btn.dataset.openCharacter;

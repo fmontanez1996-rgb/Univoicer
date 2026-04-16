@@ -3689,6 +3689,8 @@
         return acc;
       }, {});
       const defaultActorsForVideo = getActorsForUniverseCharacter(defaultCharacterForVideo);
+      const characterOptionsForVideo = getCharacterOptionsForSelect({ universeName: state.universe });
+      const actorOptionsForCharacterMode = getActorOptionsForSelect({ universeName: state.universe });
       const collectionActors = [...new Set(
         (collectionModel.actors || [])
           .map((actor) => String(actor?.name || '').trim())

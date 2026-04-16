@@ -4749,7 +4749,7 @@
     }) {
       const previousNormalized = normalizeName(currentCharacterName || '');
       const canonicalName = String(nextCharacterName || '').trim();
-      const canonicalRarity = rarezasPermitidas(nextRarity || 'Común');
+      const canonicalRarity = String(nextRarity || '').trim() || 'Común';
       const canonicalUniverses = normalizeUniverseList(nextUniverses, { fallbackToUnassigned: true });
 
       VIDEOS.forEach((video) => {
@@ -5305,6 +5305,21 @@
         const actorCards = [...unlockedActors, ...lockedActors]
           .map(item => ({ ...item, isUnlocked: !item.locked && hasGreetingVideo(item.video) }))
           .sort((a, b) => a.actorName.localeCompare(b.actorName, 'es', { sensitivity: 'base' }));
+        const rarityOptions = [...new Set([
+          ...VIDEOS.map((video) => String(video.rareza || '').trim()).filter(Boolean),
+          String(rareza || 'Común').trim() || 'Común'
+        ])].sort((a, b) => {
+          const rankDiff = rarityRank(b) - rarityRank(a);
+          if (rankDiff !== 0) return rankDiff;
+          return a.localeCompare(b, 'es', { sensitivity: 'base' });
+        });
+        const actorOptions = getActorOptionsForIndiceFilters();
+        const universeOptions = [...new Set([
+          ...getUniverseOptionsForIndiceFilters(),
+          ...universos
+        ])].sort((a, b) => a.localeCompare(b, 'es', { sensitivity: 'base' }));
+        const selectedActorsNormalized = new Set(actorCards.map((item) => normalizeName(item.actorName)));
+        const selectedUniversesNormalized = new Set(universos.map((universeName) => normalizeUniverseName(universeName)));
 
         const isCharacterLocked = realVideos.length === 0;
         const customLockedAvatarUrl = getCharacterLockedAvatarUrl(focusedCharacter);
@@ -5359,22 +5374,29 @@
                   <input type="text" name="characterName" value="${focusedCharacter}">
                 </label>
                 <label>Rareza
-                  <input type="text" name="characterRarity" value="${rareza}" placeholder="Común, Raro, Épico o Legendario">
+                  <select name="characterRarity">
+                    ${rarityOptions.map((option) => `<option value="${escapeHtml(option)}" ${option === rareza ? 'selected' : ''}>${escapeHtml(option)}</option>`).join('')}
+                  </select>
                 </label>
-                <label>Actores (separados por coma)
-                  <input type="text" name="characterActors" value="${actorCards.map(a => a.actorName).join(', ')}">
+                <label>Actores (selección múltiple)
+                  <select name="characterActors" multiple size="${Math.max(3, Math.min(actorOptions.length || 3, 8))}">
+                    ${actorOptions.map((actorName) => `<option value="${escapeHtml(actorName)}" ${selectedActorsNormalized.has(normalizeName(actorName)) ? 'selected' : ''}>${escapeHtml(actorName)}</option>`).join('')}
+                  </select>
                 </label>
-                <label>Universos (separados por coma)
-                  <input type="text" name="characterUniverses" value="${universos.join(', ')}">
+                <label>Universos (selección múltiple)
+                  <select name="characterUniverses" multiple size="${Math.max(3, Math.min(universeOptions.length || 3, 8))}">
+                    ${universeOptions.map((universeName) => `<option value="${escapeHtml(universeName)}" ${selectedUniversesNormalized.has(normalizeUniverseName(universeName)) ? 'selected' : ''}>${escapeHtml(universeName)}</option>`).join('')}
+                  </select>
                 </label>
                 <label>Avatar bloqueado (URL opcional)
-                  <input type="url" name="lockedAvatarUrl" value="${customLockedAvatarUrl}" placeholder="https://...">
+                  <input type="text" name="lockedAvatarUrl" value="${customLockedAvatarUrl}" placeholder="https://...">
                 </label>
               </div>
               <div class="character-inline-editor__actions">
                 <button type="submit" class="neon-btn neon-btn--primary">Guardar cambios</button>
                 <button type="button" id="cancelCharacterEdit" class="neon-btn">Cancelar</button>
               </div>
+              <p class="muted">Tip: usa Ctrl/Cmd + clic para acumular varias opciones en actores y universos.</p>
             </form>
             <section id="characterInlineDeletePanel" class="character-inline-editor" ${state.showCharacterInlineDelete ? '' : 'hidden'}>
               <p style="margin:0;">¿Seguro que deseas eliminar al personaje <strong>${focusedCharacter}</strong> por completo?</p>
@@ -5436,13 +5458,13 @@
           const formData = new FormData(event.currentTarget);
           const newName = String(formData.get('characterName') || '').trim();
           const newRarity = String(formData.get('characterRarity') || '').trim();
-          const newActorsRaw = String(formData.get('characterActors') || '');
-          const newUniversesRaw = String(formData.get('characterUniverses') || '');
+          const selectedActors = formData.getAll('characterActors').map((value) => String(value || '').trim()).filter(Boolean);
+          const selectedUniverses = formData.getAll('characterUniverses').map((value) => String(value || '').trim()).filter(Boolean);
           const lockedAvatarUrl = String(formData.get('lockedAvatarUrl') || '').trim();
-          if (!newName || !newRarity) return;
+          if (!newName) return;
 
-          const newActorsList = [...new Set(newActorsRaw.split(',').map(s => s.trim()).filter(Boolean))];
-          const parsedUniverses = newUniversesRaw.split(',').map(s => s.trim()).filter(Boolean);
+          const newActorsList = [...new Set(selectedActors)];
+          const parsedUniverses = [...new Set(selectedUniverses)];
           const {
             canonicalName: cleanName,
             canonicalRarity: cleanRarity,

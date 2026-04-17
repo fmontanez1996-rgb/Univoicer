@@ -158,29 +158,76 @@
       return `rare-${rareza.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')}`;
     }
 
-    function rarityRank(rareza) {
-      const normalized = String(rareza || '')
-        .trim()
-        .toLowerCase()
-        .normalize('NFD')
-        .replace(/[\u0300-\u036f]/g, '');
-      const order = { comun: 0, raro: 1, epico: 2, legendario: 3 };
-      return Object.prototype.hasOwnProperty.call(order, normalized) ? order[normalized] : -1;
+    const ROLE_PRIORITY = { protagonista: 3, villano: 2, secundario: 1, cameo: 0 };
+    const ROLE_CATEGORY_PRIORITY = { a: 2, b: 1, c: 0 };
+    const LEGACY_RARITY_TO_ROLE = {
+      Legendario: { rol: 'Protagonista', categoriaRol: 'A' },
+      'Épico': { rol: 'Protagonista', categoriaRol: 'B' },
+      Raro: { rol: 'Villano', categoriaRol: 'A' },
+      'Común': { rol: 'Secundario', categoriaRol: 'B' }
+    };
+
+    function normalizeRole(value) {
+      return String(value || '').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
     }
 
-    function highestRarityForActorCharacter(actorName, characterName) {
-      const labels = ['Común', 'Raro', 'Épico', 'Legendario'];
-      let maxRank = -1;
+    function normalizeRoleCategory(value) {
+      return String(value || '').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    }
 
+    function roleRank(rol, categoriaRol) {
+      const normalizedRole = normalizeRole(rol);
+      const normalizedCategory = normalizeRoleCategory(categoriaRol);
+      const roleValue = Object.prototype.hasOwnProperty.call(ROLE_PRIORITY, normalizedRole)
+        ? ROLE_PRIORITY[normalizedRole]
+        : -1;
+      const categoryValue = Object.prototype.hasOwnProperty.call(ROLE_CATEGORY_PRIORITY, normalizedCategory)
+        ? ROLE_CATEGORY_PRIORITY[normalizedCategory]
+        : -1;
+      if (roleValue < 0) return -1;
+      return (roleValue * 100) + Math.max(categoryValue, 0);
+    }
+
+    function getVideoRoleCategory(video) {
+      const explicitRole = String(video?.rol || '').trim();
+      const explicitCategory = String(video?.categoria_rol || '').trim().toUpperCase();
+      if (explicitRole) {
+        return {
+          rol: explicitRole,
+          categoriaRol: explicitCategory || 'B'
+        };
+      }
+      const mapped = LEGACY_RARITY_TO_ROLE[String(video?.rareza || 'Común').trim()] || LEGACY_RARITY_TO_ROLE['Común'];
+      return { ...mapped };
+    }
+
+    function roleCategoryLabel(rol, categoriaRol) {
+      const cleanRole = String(rol || '').trim() || 'Sin rol';
+      const cleanCategory = String(categoriaRol || '').trim().toUpperCase();
+      return cleanCategory ? `${cleanRole} ${cleanCategory}` : cleanRole;
+    }
+
+    function roleRankForLegacyRarity(rareza) {
+      const mapped = LEGACY_RARITY_TO_ROLE[String(rareza || 'Común').trim()] || LEGACY_RARITY_TO_ROLE['Común'];
+      return roleRank(mapped.rol, mapped.categoriaRol);
+    }
+
+    function highestRoleCategoryForActorCharacter(actorName, characterName) {
+      let best = null;
+      let maxRank = -1;
       for (const video of VIDEOS) {
         if ((video.actor_de_doblaje || 'Sin actor') === actorName &&
             (video.personaje || 'Sin personaje') === characterName) {
-          const rank = rarityRank(video.rareza || 'Común');
-          if (rank > maxRank) maxRank = rank;
+          const { rol, categoriaRol } = getVideoRoleCategory(video);
+          const rank = roleRank(rol, categoriaRol);
+          if (rank > maxRank) {
+            maxRank = rank;
+            best = { rol, categoriaRol };
+          }
         }
       }
-
-      return maxRank >= 0 ? labels[maxRank] : 'Bloqueado';
+      if (!best) return { rol: 'Bloqueado', categoriaRol: '', label: 'Bloqueado' };
+      return { ...best, label: roleCategoryLabel(best.rol, best.categoriaRol) };
     }
 
     function rarityColorValue(rareza) {
@@ -4809,7 +4856,10 @@
       const universeMap = groupByUniverse();
       const universeCompleted = Object.values(universeMap).some(data => data.totalCharacters >= 3);
       const tenSameUniverse = Object.values(universeMap).some(data => data.totalCharacters >= 10);
-      const fiveLegendary = VIDEOS.filter(v => v.rareza === 'Legendario').length >= 5;
+      const fiveProtagonistaA = VIDEOS.filter((video) => {
+        const { rol, categoriaRol } = getVideoRoleCategory(video);
+        return normalizeRole(rol) === 'protagonista' && normalizeRoleCategory(categoriaRol) === 'a';
+      }).length >= 5;
 
       const achievements = [
         {
@@ -4823,9 +4873,9 @@
           unlocked: tenSameUniverse
         },
         {
-          title: '5 videos legendarios',
-          description: 'Consigue 5 videos con rareza Legendario.',
-          unlocked: fiveLegendary
+          title: '5 roles Protagonista A',
+          description: 'Consigue 5 videos clasificados como Protagonista A.',
+          unlocked: fiveProtagonistaA
         }
       ];
 
@@ -4880,6 +4930,7 @@
               if (!character.unlocked) {
                 const rarity = character.rareza || 'Bloqueado';
                 const rarityClassName = rarityClass(rarity);
+                const roleData = LEGACY_RARITY_TO_ROLE[rarity] || { rol: 'Bloqueado', categoriaRol: '' };
                 return `
                   <article class="collection-card collection-character-card locked ${rarityClassName}" style="--rarity-color:${rarityColorValue(rarity)};">
                     <div class="locked-silhouette" aria-hidden="true">
@@ -4888,13 +4939,14 @@
                     </div>
                     <div class="card-footer">
                       <p class="meta character-name">${character.name}</p>
-                      <p class="meta"><small>Rareza:</small><span class="badge ${rarityClassName}">${rarity}</span></p>
+                      <p class="meta"><small>Rol:</small><span class="badge ${rarityClassName}">${roleCategoryLabel(roleData.rol, roleData.categoriaRol)}</span></p>
                       <p class="meta"><small>Estado:</small>🔒 Bloqueado</p>
                       <p class="meta"><small>Actor:</small>${character.actor || 'Sin actor'}</p>
                     </div>
                   </article>
                 `;
               }
+              const roleData = LEGACY_RARITY_TO_ROLE[character.rareza || 'Común'] || LEGACY_RARITY_TO_ROLE['Común'];
               return `
                 <article
                   class="collection-card collection-character-card unlocked ${newlyUnlocked ? 'is-newly-unlocked' : ''}"
@@ -4907,7 +4959,7 @@
                   <div class="card-footer">
                     <p class="meta"><small>Actor:</small>${character.actor || 'Sin actor'}</p>
                     <p class="meta"><small>Universos:</small>${character.universes.length ? character.universes.join(', ') : 'Sin universo'}</p>
-                    <span class="badge ${rarityClass(character.rareza || 'Común')}">${character.rareza || 'Común'}</span>
+                    <span class="badge ${rarityClass(character.rareza || 'Común')}">${roleCategoryLabel(roleData.rol, roleData.categoriaRol)}</span>
                   </div>
                 </article>
               `;
@@ -5055,8 +5107,8 @@
           return true;
         })
         .sort((a, b) => {
-          const rarityDiff = rarityRank(b.rareza) - rarityRank(a.rareza);
-          if (rarityDiff !== 0) return rarityDiff;
+          const roleDiff = roleRank(b.rol, b.categoriaRol) - roleRank(a.rol, a.categoriaRol);
+          if (roleDiff !== 0) return roleDiff;
           return a.name.localeCompare(b.name, 'es', { sensitivity: 'base' });
         });
     }
@@ -5532,6 +5584,9 @@
     function showIndiceCharacterPreview(item, anchorEl) {
       if (!item || !anchorEl) return;
       removeIndicePreviewPopover();
+      const previewRole = item?.rol
+        ? { rol: item.rol, categoriaRol: item.categoriaRol || 'B' }
+        : getVideoRoleCategory(item?.coverVideo || item || {});
       const popover = document.createElement('article');
       popover.id = 'characterPreviewPopover';
       popover.className = 'character-preview-popover';
@@ -5541,7 +5596,7 @@
         <img src="${item.coverVideo ? getVideoThumbnail(item.coverVideo) : createPlaceholderCover(item.name)}" alt="Vista previa de ${item.name}">
         <div class="preview-meta">
           <h3>${item.name}</h3>
-          <p><span class="preview-field-label">Rareza</span><span class="preview-field-value">${item.rareza || 'Común'}</span></p>
+          <p><span class="preview-field-label">Rol</span><span class="preview-field-value">${roleCategoryLabel(previewRole.rol, previewRole.categoriaRol)}</span></p>
           <p><span class="preview-field-label">Actores</span><span class="preview-field-value">${item.actors.length ? item.actors.join(', ') : 'Sin actores asociados'}</span></p>
           <p><span class="preview-field-label">Universos</span><span class="preview-field-value">${item.universes.length ? item.universes.join(', ') : 'Sin universo'}</span></p>
         </div>
@@ -5629,6 +5684,10 @@
       const cardName = String(item?.name || item?.characterName || '').trim();
       if (!cardName) return '';
       const locked = Boolean(options.locked ?? !item?.unlocked);
+      const roleData = item?.rol
+        ? { rol: item.rol, categoriaRol: item.categoriaRol || 'B' }
+        : getVideoRoleCategory(item?.coverVideo || item || {});
+      const roleLabel = roleCategoryLabel(roleData.rol, roleData.categoriaRol);
       const rarityValue = String(item?.rareza || item?.coverVideo?.rareza || 'Común');
       const rarityData = rarityValue.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
       const glowColor = rarityColorValue(rarityValue);
@@ -5669,6 +5728,7 @@
           ${renderMedia()}
           <div class="meta">
             <h3>${cardName}</h3>
+            <p class="meta">${escapeHtml(roleLabel)}</p>
           </div>
         </button>
       `;
@@ -6048,19 +6108,20 @@
       )].sort((a, b) => a.localeCompare(b, 'es', { sensitivity: 'base' }));
       const indexUniverseFilters = getUniverseOptionsForIndiceFilters();
       const indexActorFilters = getActorOptionsForIndiceFilters();
-      const rarityGroupLabels = {
-        Legendario: 'Legendarios',
-        'Épico': 'Épicos',
-        Raro: 'Raros',
-        'Común': 'Comunes'
+      const roleGroupLabels = {
+        'Protagonista A': 'Protagonista A',
+        'Protagonista B': 'Protagonista B',
+        'Villano A': 'Villano A',
+        'Secundario B': 'Secundario B',
+        Bloqueado: 'Bloqueado'
       };
       const groupedIndexItems = indexItems.reduce((acc, item) => {
-        const rarity = item.rareza || 'Común';
-        if (!acc.has(rarity)) acc.set(rarity, []);
-        acc.get(rarity).push(item);
+        const roleLabel = roleCategoryLabel(item.rol, item.categoriaRol);
+        if (!acc.has(roleLabel)) acc.set(roleLabel, []);
+        acc.get(roleLabel).push(item);
         return acc;
       }, new Map());
-      const rarityRenderOrder = ['Legendario', 'Épico', 'Raro', 'Común'];
+      const roleRenderOrder = ['Protagonista A', 'Protagonista B', 'Villano A', 'Secundario B', 'Bloqueado'];
       viewIndice.innerHTML = `
         <section class="mock-shell">
           <div class="indice-toolbar">
@@ -6123,21 +6184,21 @@
           </div>
           <section class="characters-gallery">
             ${indexItems.length
-              ? rarityRenderOrder
-                .filter((rarity) => groupedIndexItems.has(rarity))
-                .map((rarity) => `
+              ? roleRenderOrder
+                .filter((roleLabel) => groupedIndexItems.has(roleLabel))
+                .map((roleLabel) => `
                   <button
                     type="button"
                     class="indice-group-divider indice-group-toggle"
-                    data-toggle-rarity="${rarity}"
-                    aria-expanded="${state.indiceCollapsedRarities.has(rarity) ? 'false' : 'true'}"
+                    data-toggle-rarity="${roleLabel}"
+                    aria-expanded="${state.indiceCollapsedRarities.has(roleLabel) ? 'false' : 'true'}"
                   >
-                    <span>${rarityGroupLabels[rarity] || rarity}</span>
-                    <span class="indice-group-toggle-icon">${state.indiceCollapsedRarities.has(rarity) ? '▸' : '▾'}</span>
+                    <span>${roleGroupLabels[roleLabel] || roleLabel}</span>
+                    <span class="indice-group-toggle-icon">${state.indiceCollapsedRarities.has(roleLabel) ? '▸' : '▾'}</span>
                   </button>
-                  ${state.indiceCollapsedRarities.has(rarity)
+                  ${state.indiceCollapsedRarities.has(roleLabel)
                     ? ''
-                    : groupedIndexItems.get(rarity).map(item => renderCharacterGalleryCard(item, { locked: !item.unlocked })).join('')}
+                    : groupedIndexItems.get(roleLabel).map(item => renderCharacterGalleryCard(item, { locked: !item.unlocked })).join('')}
                 `).join('')
               : '<p class="muted">No hay personajes cargados.</p>'}
           </section>
@@ -6655,12 +6716,14 @@
       const actorCharacterCards = [
         ...actorCharacters.map((characterName) => {
           const relatedVideo = actorVideos.find(item => (item.personaje || 'Sin personaje') === characterName && hasGreetingVideo(item));
-          const rarity = highestRarityForActorCharacter(actor, characterName);
+          const roleData = highestRoleCategoryForActorCharacter(actor, characterName);
           return {
             characterName,
             unlocked: Boolean(relatedVideo),
-            rarity,
-            rarityClassName: rarityClass(rarity),
+            rarity: roleData.label,
+            rarityClassName: rarityClass(roleData.label),
+            rol: roleData.rol,
+            categoriaRol: roleData.categoriaRol,
             video: relatedVideo || null
           };
         }),
@@ -6677,6 +6740,8 @@
             unlocked: false,
             rarity,
             rarityClassName: rarityClass(rarity),
+            rol: bestRoleData?.rol || 'Bloqueado',
+            categoriaRol: bestRoleData?.categoriaRol || '',
             video: null
           };
         })
@@ -6703,6 +6768,8 @@
                     name: item.characterName,
                     coverVideo: item.video || null,
                     rareza: item.rarity,
+                    rol: item.rol,
+                    categoriaRol: item.categoriaRol,
                     unlocked: item.unlocked
                   }, { locked: !item.unlocked })}
                 </li>

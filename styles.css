@@ -19,10 +19,14 @@
       --neon-purple: #b98cff;
       --ok: #179d6c;
       --ok-soft: rgba(23, 157, 108, .18);
-      --rare-comun: #52d88a;
-      --rare-raro: #5da8ff;
-      --rare-epico: #b786ff;
-      --rare-legendario: #f4c45a;
+      --role-protagonista-a: #2f7dff;
+      --role-protagonista-b: #66d9ff;
+      --role-villano-a: #ff4d5f;
+      --role-villano-b: #a86bff;
+      --role-secundario-a: #ffd54a;
+      --role-secundario-b: #ff9f43;
+      --role-recurrente-a: #f5fbff;
+      --role-recurrente-b: #a5b0c2;
       --shadow: 0 18px 40px rgba(2, 8, 20, .62);
       --shadow-soft: 0 10px 24px rgba(3, 11, 29, .52);
       --radius: 22px;
@@ -2090,22 +2094,38 @@
       filter: saturate(.8);
       box-shadow: 0 8px 18px rgba(4, 12, 26, .5), inset 0 1px 0 rgba(210, 228, 255, .08);
     }
-    .actor-character-item .actor-character-card.rare-comun {
-      --rarity-color: var(--rare-comun);
+    .actor-character-item .actor-character-card.role-protagonista-a {
+      --rarity-color: var(--role-protagonista-a);
     }
-    .actor-character-item .actor-character-card.rare-raro {
-      --rarity-color: var(--rare-raro);
+    .actor-character-item .actor-character-card.role-protagonista-b {
+      --rarity-color: var(--role-protagonista-b);
     }
-    .actor-character-item .actor-character-card.rare-epico {
-      --rarity-color: var(--rare-epico);
+    .actor-character-item .actor-character-card.role-villano-a {
+      --rarity-color: var(--role-villano-a);
     }
-    .actor-character-item .actor-character-card.rare-legendario {
-      --rarity-color: var(--rare-legendario);
+    .actor-character-item .actor-character-card.role-villano-b {
+      --rarity-color: var(--role-villano-b);
     }
-    .actor-character-item .actor-character-card:not(.locked).rare-comun,
-    .actor-character-item .actor-character-card:not(.locked).rare-raro,
-    .actor-character-item .actor-character-card:not(.locked).rare-epico,
-    .actor-character-item .actor-character-card:not(.locked).rare-legendario {
+    .actor-character-item .actor-character-card.role-secundario-a {
+      --rarity-color: var(--role-secundario-a);
+    }
+    .actor-character-item .actor-character-card.role-secundario-b {
+      --rarity-color: var(--role-secundario-b);
+    }
+    .actor-character-item .actor-character-card.role-recurrente-a {
+      --rarity-color: var(--role-recurrente-a);
+    }
+    .actor-character-item .actor-character-card.role-recurrente-b {
+      --rarity-color: var(--role-recurrente-b);
+    }
+    .actor-character-item .actor-character-card:not(.locked).role-protagonista-a,
+    .actor-character-item .actor-character-card:not(.locked).role-protagonista-b,
+    .actor-character-item .actor-character-card:not(.locked).role-villano-a,
+    .actor-character-item .actor-character-card:not(.locked).role-villano-b,
+    .actor-character-item .actor-character-card:not(.locked).role-secundario-a,
+    .actor-character-item .actor-character-card:not(.locked).role-secundario-b,
+    .actor-character-item .actor-character-card:not(.locked).role-recurrente-a,
+    .actor-character-item .actor-character-card:not(.locked).role-recurrente-b {
       border-color: color-mix(in srgb, var(--rarity-color, rgba(130, 186, 255, .7)) 72%, white);
       box-shadow:
         0 10px 24px rgba(3, 10, 24, .58),
@@ -2240,10 +2260,14 @@
       letter-spacing: .2px;
     }
 
-    .rare-comun { background: color-mix(in srgb, var(--rare-comun) 16%, rgba(5, 13, 29, .84)); color: var(--rare-comun); border-color: color-mix(in srgb, var(--rare-comun) 42%, rgba(180, 210, 235, .3)); }
-    .rare-raro { background: color-mix(in srgb, var(--rare-raro) 16%, rgba(5, 13, 29, .84)); color: var(--rare-raro); border-color: color-mix(in srgb, var(--rare-raro) 42%, rgba(180, 210, 235, .3)); }
-    .rare-epico { background: color-mix(in srgb, var(--rare-epico) 16%, rgba(5, 13, 29, .84)); color: var(--rare-epico); border-color: color-mix(in srgb, var(--rare-epico) 42%, rgba(180, 210, 235, .3)); }
-    .rare-legendario { background: color-mix(in srgb, var(--rare-legendario) 16%, rgba(5, 13, 29, .84)); color: var(--rare-legendario); border-color: color-mix(in srgb, var(--rare-legendario) 42%, rgba(180, 210, 235, .3)); }
+    .role-protagonista-a { background: color-mix(in srgb, var(--role-protagonista-a) 16%, rgba(5, 13, 29, .84)); color: var(--role-protagonista-a); border-color: color-mix(in srgb, var(--role-protagonista-a) 42%, rgba(180, 210, 235, .3)); }
+    .role-protagonista-b { background: color-mix(in srgb, var(--role-protagonista-b) 16%, rgba(5, 13, 29, .84)); color: var(--role-protagonista-b); border-color: color-mix(in srgb, var(--role-protagonista-b) 42%, rgba(180, 210, 235, .3)); }
+    .role-villano-a { background: color-mix(in srgb, var(--role-villano-a) 16%, rgba(5, 13, 29, .84)); color: var(--role-villano-a); border-color: color-mix(in srgb, var(--role-villano-a) 42%, rgba(180, 210, 235, .3)); }
+    .role-villano-b { background: color-mix(in srgb, var(--role-villano-b) 16%, rgba(5, 13, 29, .84)); color: var(--role-villano-b); border-color: color-mix(in srgb, var(--role-villano-b) 42%, rgba(180, 210, 235, .3)); }
+    .role-secundario-a { background: color-mix(in srgb, var(--role-secundario-a) 16%, rgba(5, 13, 29, .84)); color: var(--role-secundario-a); border-color: color-mix(in srgb, var(--role-secundario-a) 42%, rgba(180, 210, 235, .3)); }
+    .role-secundario-b { background: color-mix(in srgb, var(--role-secundario-b) 16%, rgba(5, 13, 29, .84)); color: var(--role-secundario-b); border-color: color-mix(in srgb, var(--role-secundario-b) 42%, rgba(180, 210, 235, .3)); }
+    .role-recurrente-a { background: color-mix(in srgb, var(--role-recurrente-a) 16%, rgba(5, 13, 29, .84)); color: var(--role-recurrente-a); border-color: color-mix(in srgb, var(--role-recurrente-a) 42%, rgba(180, 210, 235, .3)); }
+    .role-recurrente-b { background: color-mix(in srgb, var(--role-recurrente-b) 16%, rgba(5, 13, 29, .84)); color: var(--role-recurrente-b); border-color: color-mix(in srgb, var(--role-recurrente-b) 42%, rgba(180, 210, 235, .3)); }
     .rare-bloqueado { background: rgba(126, 144, 175, .14); color: #c6d8ee; border-color: rgba(126, 144, 175, .38); }
 
     .rarity-highlight {
@@ -2261,28 +2285,28 @@
       text-shadow: 0 0 12px rgba(255, 255, 255, .2);
     }
 
-    .rarity-highlight.rare-comun {
+    .rarity-highlight.role-recurrente-a {
       background: linear-gradient(160deg, rgba(57, 72, 95, .72), rgba(26, 36, 52, .92));
       border-color: rgba(157, 178, 203, .85);
       box-shadow: inset 0 0 0 1px rgba(208, 220, 234, .16), 0 0 0 1px rgba(157, 178, 203, .34), 0 0 24px rgba(157, 178, 203, .28);
       text-shadow: 0 0 10px rgba(157, 178, 203, .55);
     }
 
-    .rarity-highlight.rare-raro {
+    .rarity-highlight.role-secundario-a {
       background: linear-gradient(160deg, rgba(9, 72, 83, .78), rgba(3, 30, 41, .95));
       border-color: rgba(102, 238, 247, .95);
       box-shadow: inset 0 0 0 1px rgba(184, 253, 255, .2), 0 0 0 1px rgba(102, 238, 247, .45), 0 0 28px rgba(102, 238, 247, .35);
       text-shadow: 0 0 12px rgba(102, 238, 247, .65);
     }
 
-    .rarity-highlight.rare-epico {
+    .rarity-highlight.role-villano-b {
       background: linear-gradient(160deg, rgba(82, 46, 148, .78), rgba(35, 18, 67, .95));
       border-color: rgba(197, 143, 255, .95);
       box-shadow: inset 0 0 0 1px rgba(239, 215, 255, .18), 0 0 0 1px rgba(197, 143, 255, .4), 0 0 30px rgba(197, 143, 255, .36);
       text-shadow: 0 0 13px rgba(197, 143, 255, .68);
     }
 
-    .rarity-highlight.rare-legendario {
+    .rarity-highlight.role-protagonista-a {
       background: linear-gradient(160deg, rgba(121, 67, 8, .82), rgba(56, 29, 3, .96));
       border-color: rgba(255, 187, 102, .98);
       box-shadow: inset 0 0 0 1px rgba(255, 226, 187, .2), 0 0 0 1px rgba(255, 187, 102, .44), 0 0 32px rgba(255, 187, 102, .38);
@@ -2928,33 +2952,33 @@
       background: linear-gradient(180deg, rgba(255, 255, 255, .34), rgba(255, 255, 255, 0));
       pointer-events: none;
     }
-    .character-hero__badge.rare-comun {
-      --badge-glow: color-mix(in srgb, var(--rare-comun) 58%, rgba(120, 214, 165, .35));
-      --badge-top: color-mix(in srgb, var(--rare-comun) 36%, rgba(206, 241, 224, .4));
-      --badge-base: color-mix(in srgb, var(--rare-comun) 20%, rgba(7, 25, 35, .92));
-      --badge-base-2: color-mix(in srgb, var(--rare-comun) 10%, rgba(6, 14, 28, .95));
-      --badge-edge: color-mix(in srgb, var(--rare-comun) 55%, rgba(188, 236, 208, .46));
+    .character-hero__badge.role-recurrente-a {
+      --badge-glow: color-mix(in srgb, var(--role-recurrente-a) 58%, rgba(120, 214, 165, .35));
+      --badge-top: color-mix(in srgb, var(--role-recurrente-a) 36%, rgba(206, 241, 224, .4));
+      --badge-base: color-mix(in srgb, var(--role-recurrente-a) 20%, rgba(7, 25, 35, .92));
+      --badge-base-2: color-mix(in srgb, var(--role-recurrente-a) 10%, rgba(6, 14, 28, .95));
+      --badge-edge: color-mix(in srgb, var(--role-recurrente-a) 55%, rgba(188, 236, 208, .46));
     }
-    .character-hero__badge.rare-raro {
-      --badge-glow: color-mix(in srgb, var(--rare-raro) 58%, rgba(116, 186, 255, .35));
-      --badge-top: color-mix(in srgb, var(--rare-raro) 36%, rgba(214, 236, 255, .42));
-      --badge-base: color-mix(in srgb, var(--rare-raro) 20%, rgba(8, 24, 44, .92));
-      --badge-base-2: color-mix(in srgb, var(--rare-raro) 10%, rgba(6, 14, 29, .95));
-      --badge-edge: color-mix(in srgb, var(--rare-raro) 55%, rgba(186, 222, 255, .48));
+    .character-hero__badge.role-secundario-a {
+      --badge-glow: color-mix(in srgb, var(--role-secundario-a) 58%, rgba(116, 186, 255, .35));
+      --badge-top: color-mix(in srgb, var(--role-secundario-a) 36%, rgba(214, 236, 255, .42));
+      --badge-base: color-mix(in srgb, var(--role-secundario-a) 20%, rgba(8, 24, 44, .92));
+      --badge-base-2: color-mix(in srgb, var(--role-secundario-a) 10%, rgba(6, 14, 29, .95));
+      --badge-edge: color-mix(in srgb, var(--role-secundario-a) 55%, rgba(186, 222, 255, .48));
     }
-    .character-hero__badge.rare-epico {
-      --badge-glow: color-mix(in srgb, var(--rare-epico) 60%, rgba(188, 131, 255, .34));
-      --badge-top: color-mix(in srgb, var(--rare-epico) 34%, rgba(244, 220, 255, .42));
-      --badge-base: color-mix(in srgb, var(--rare-epico) 22%, rgba(24, 13, 48, .92));
-      --badge-base-2: color-mix(in srgb, var(--rare-epico) 12%, rgba(11, 8, 27, .95));
-      --badge-edge: color-mix(in srgb, var(--rare-epico) 56%, rgba(230, 188, 255, .46));
+    .character-hero__badge.role-villano-b {
+      --badge-glow: color-mix(in srgb, var(--role-villano-b) 60%, rgba(188, 131, 255, .34));
+      --badge-top: color-mix(in srgb, var(--role-villano-b) 34%, rgba(244, 220, 255, .42));
+      --badge-base: color-mix(in srgb, var(--role-villano-b) 22%, rgba(24, 13, 48, .92));
+      --badge-base-2: color-mix(in srgb, var(--role-villano-b) 12%, rgba(11, 8, 27, .95));
+      --badge-edge: color-mix(in srgb, var(--role-villano-b) 56%, rgba(230, 188, 255, .46));
     }
-    .character-hero__badge.rare-legendario {
-      --badge-glow: color-mix(in srgb, var(--rare-legendario) 62%, rgba(255, 187, 88, .38));
-      --badge-top: color-mix(in srgb, var(--rare-legendario) 34%, rgba(255, 234, 188, .44));
-      --badge-base: color-mix(in srgb, var(--rare-legendario) 24%, rgba(57, 27, 6, .92));
-      --badge-base-2: color-mix(in srgb, var(--rare-legendario) 12%, rgba(20, 11, 5, .95));
-      --badge-edge: color-mix(in srgb, var(--rare-legendario) 56%, rgba(255, 215, 139, .5));
+    .character-hero__badge.role-protagonista-a {
+      --badge-glow: color-mix(in srgb, var(--role-protagonista-a) 62%, rgba(255, 187, 88, .38));
+      --badge-top: color-mix(in srgb, var(--role-protagonista-a) 34%, rgba(255, 234, 188, .44));
+      --badge-base: color-mix(in srgb, var(--role-protagonista-a) 24%, rgba(57, 27, 6, .92));
+      --badge-base-2: color-mix(in srgb, var(--role-protagonista-a) 12%, rgba(20, 11, 5, .95));
+      --badge-edge: color-mix(in srgb, var(--role-protagonista-a) 56%, rgba(255, 215, 139, .5));
     }
     .character-hero__badge--universes {
       --badge-glow: rgba(123, 215, 255, .26);
@@ -3238,9 +3262,9 @@
       z-index: 1;
     }
     .character-gallery-card {
-      --rarity-glow: rgba(111, 180, 255, .4);
+      --role-glow: rgba(111, 180, 255, .4);
       --float-delay: 0s;
-      border: 1.5px solid color-mix(in srgb, var(--rarity-glow) 78%, white 22%);
+      border: 1.5px solid color-mix(in srgb, var(--role-glow) 78%, white 22%);
       border-radius: 16px;
       overflow: hidden;
       background:
@@ -3251,13 +3275,13 @@
       box-shadow:
         0 16px 30px rgba(1, 5, 16, .78),
         0 24px 34px -14px rgba(0, 0, 0, .7),
-        0 0 0 1px color-mix(in srgb, var(--rarity-glow) 36%, rgba(243, 249, 255, .52)),
+        0 0 0 1px color-mix(in srgb, var(--role-glow) 36%, rgba(243, 249, 255, .52)),
         inset 1px 1px 0 rgba(237, 247, 255, .34),
         inset 0 2px 10px rgba(218, 235, 255, .14),
         inset -2px -3px 14px rgba(5, 12, 28, .62),
-        0 10px 20px color-mix(in srgb, var(--rarity-glow) 24%, transparent),
-        0 0 20px color-mix(in srgb, var(--rarity-glow) 26%, transparent),
-        0 0 34px color-mix(in srgb, var(--rarity-glow) 18%, transparent);
+        0 10px 20px color-mix(in srgb, var(--role-glow) 24%, transparent),
+        0 0 20px color-mix(in srgb, var(--role-glow) 26%, transparent),
+        0 0 34px color-mix(in srgb, var(--role-glow) 18%, transparent);
       cursor: pointer;
       text-align: left;
       padding: 0;
@@ -3288,24 +3312,24 @@
       position: absolute;
       inset: -3px;
       border-radius: 18px;
-      border: 1.5px solid color-mix(in srgb, var(--rarity-glow) 62%, rgba(228, 244, 255, .72));
+      border: 1.5px solid color-mix(in srgb, var(--role-glow) 62%, rgba(228, 244, 255, .72));
       opacity: .7;
       pointer-events: none;
     }
     .character-gallery-card:hover {
-      border-color: color-mix(in srgb, var(--rarity-glow) 92%, white 8%);
+      border-color: color-mix(in srgb, var(--role-glow) 92%, white 8%);
       transform: translate3d(0, -5px, 0) scale(1.035);
       box-shadow:
         0 24px 34px rgba(2, 7, 19, .84),
         0 34px 38px -16px rgba(0, 0, 0, .74),
-        0 0 0 2px color-mix(in srgb, var(--rarity-glow) 72%, white 28%),
-        0 0 34px color-mix(in srgb, var(--rarity-glow) 54%, transparent),
-        0 0 56px color-mix(in srgb, var(--rarity-glow) 34%, transparent),
+        0 0 0 2px color-mix(in srgb, var(--role-glow) 72%, white 28%),
+        0 0 34px color-mix(in srgb, var(--role-glow) 54%, transparent),
+        0 0 56px color-mix(in srgb, var(--role-glow) 34%, transparent),
         inset 1px 1px 0 rgba(241, 250, 255, .34),
         inset -2px -4px 15px rgba(4, 11, 26, .64);
     }
     .character-gallery-card:hover::after {
-      border-color: color-mix(in srgb, var(--rarity-glow) 84%, rgba(238, 248, 255, .82));
+      border-color: color-mix(in srgb, var(--role-glow) 84%, rgba(238, 248, 255, .82));
       opacity: .95;
     }
     .character-gallery-card:hover h3 {
@@ -3315,22 +3339,22 @@
         1px -1px 0 #102142,
         -1px 1px 0 #102142,
         1px 1px 0 #102142,
-        0 0 10px color-mix(in srgb, var(--rarity-glow) 54%, rgba(255, 238, 170, .74)),
-        0 0 22px color-mix(in srgb, var(--rarity-glow) 42%, transparent);
+        0 0 10px color-mix(in srgb, var(--role-glow) 54%, rgba(255, 238, 170, .74)),
+        0 0 22px color-mix(in srgb, var(--role-glow) 42%, transparent);
     }
-    .character-gallery-card[data-rarity="epico"] {
-      border-color: color-mix(in srgb, var(--rarity-glow) 78%, white 22%);
+    .character-gallery-card[data-role-tier="villano-b"] {
+      border-color: color-mix(in srgb, var(--role-glow) 78%, white 22%);
     }
-    .character-gallery-card[data-rarity="epico"] .meta,
-    .character-gallery-card[data-rarity="epico"] h3 {
-      border-color: color-mix(in srgb, var(--rarity-glow) 46%, rgba(230, 241, 255, .22));
+    .character-gallery-card[data-role-tier="villano-b"] .meta,
+    .character-gallery-card[data-role-tier="villano-b"] h3 {
+      border-color: color-mix(in srgb, var(--role-glow) 46%, rgba(230, 241, 255, .22));
     }
-    .character-gallery-card[data-rarity="legendario"] {
-      border-color: color-mix(in srgb, var(--rarity-glow) 78%, white 22%);
+    .character-gallery-card[data-role-tier="protagonista-a"] {
+      border-color: color-mix(in srgb, var(--role-glow) 78%, white 22%);
     }
-    .character-gallery-card[data-rarity="legendario"] .meta,
-    .character-gallery-card[data-rarity="legendario"] h3 {
-      border-color: color-mix(in srgb, var(--rarity-glow) 46%, rgba(230, 241, 255, .22));
+    .character-gallery-card[data-role-tier="protagonista-a"] .meta,
+    .character-gallery-card[data-role-tier="protagonista-a"] h3 {
+      border-color: color-mix(in srgb, var(--role-glow) 46%, rgba(230, 241, 255, .22));
     }
     .character-gallery-card .character-gallery-media {
       width: 100%;
@@ -3378,7 +3402,7 @@
       display: grid;
       gap: 4px;
       background: linear-gradient(180deg, rgba(7, 15, 35, .1), rgba(5, 11, 24, .88) 45%);
-      border-top: 1px solid color-mix(in srgb, var(--rarity-glow) 42%, rgba(230, 241, 255, .22));
+      border-top: 1px solid color-mix(in srgb, var(--role-glow) 42%, rgba(230, 241, 255, .22));
       position: relative;
       z-index: 1;
     }
@@ -3391,15 +3415,15 @@
       line-height: 1.08;
       letter-spacing: .01em;
       color: #ffd84a;
-      border-bottom: 1px solid color-mix(in srgb, var(--rarity-glow) 46%, rgba(232, 242, 255, .22));
+      border-bottom: 1px solid color-mix(in srgb, var(--role-glow) 46%, rgba(232, 242, 255, .22));
       text-shadow:
         -1px -1px 0 #102142,
         1px -1px 0 #102142,
         -1px 1px 0 #102142,
         1px 1px 0 #102142,
         0 2px 0 rgba(8, 14, 32, .85),
-        0 0 10px color-mix(in srgb, var(--rarity-glow) 48%, rgba(255, 223, 118, .65)),
-        0 0 20px color-mix(in srgb, var(--rarity-glow) 36%, transparent);
+        0 0 10px color-mix(in srgb, var(--role-glow) 48%, rgba(255, 223, 118, .65)),
+        0 0 20px color-mix(in srgb, var(--role-glow) 36%, transparent);
       display: -webkit-box;
       -webkit-line-clamp: 3;
       -webkit-box-orient: vertical;
@@ -3510,15 +3534,15 @@
       position: fixed;
       width: min(420px, calc(100vw - 28px));
       border-radius: 22px;
-      border: 2px solid color-mix(in srgb, var(--preview-rarity, rgba(107, 188, 255, .5)) 70%, #f5fbff 30%);
+      border: 2px solid color-mix(in srgb, var(--preview-role, rgba(107, 188, 255, .5)) 70%, #f5fbff 30%);
       background:
         linear-gradient(160deg, rgba(255, 255, 255, .16), transparent 38%),
-        radial-gradient(140px 120px at 12% 10%, color-mix(in srgb, var(--preview-rarity, rgba(107, 188, 255, .5)) 60%, rgba(255, 255, 255, .24) 40%) 0%, transparent 72%),
+        radial-gradient(140px 120px at 12% 10%, color-mix(in srgb, var(--preview-role, rgba(107, 188, 255, .5)) 60%, rgba(255, 255, 255, .24) 40%) 0%, transparent 72%),
         radial-gradient(170px 130px at 88% 0%, rgba(110, 160, 255, .22) 0%, transparent 74%),
         linear-gradient(172deg, rgba(12, 26, 54, .99), rgba(4, 10, 24, .99));
       box-shadow:
         0 28px 48px rgba(2, 7, 19, .86),
-        0 0 58px color-mix(in srgb, var(--preview-rarity, rgba(107, 188, 255, .5)) 56%, transparent),
+        0 0 58px color-mix(in srgb, var(--preview-role, rgba(107, 188, 255, .5)) 56%, transparent),
         inset 0 1px 0 rgba(239, 247, 255, .24),
         inset 0 -22px 40px rgba(0, 0, 0, .42),
         inset 0 0 0 1px rgba(199, 221, 255, .14);
@@ -3548,16 +3572,16 @@
       position: absolute;
       inset: 8px;
       border-radius: 16px 28px 18px 30px;
-      border: 1px solid color-mix(in srgb, var(--preview-rarity, rgba(107, 188, 255, .5)) 32%, rgba(255, 255, 255, .36));
+      border: 1px solid color-mix(in srgb, var(--preview-role, rgba(107, 188, 255, .5)) 32%, rgba(255, 255, 255, .36));
       box-shadow:
-        0 0 24px color-mix(in srgb, var(--preview-rarity, rgba(107, 188, 255, .5)) 26%, transparent),
+        0 0 24px color-mix(in srgb, var(--preview-role, rgba(107, 188, 255, .5)) 26%, transparent),
         inset 0 0 0 1px rgba(219, 236, 255, .08),
         inset 0 0 18px rgba(176, 218, 255, .12);
       pointer-events: none;
       opacity: .84;
     }
     .character-preview-popover[data-locked="true"] {
-      border-color: color-mix(in srgb, var(--preview-rarity, rgba(107, 188, 255, .5)) 60%, #f5f8ff 40%);
+      border-color: color-mix(in srgb, var(--preview-role, rgba(107, 188, 255, .5)) 60%, #f5f8ff 40%);
       background:
         radial-gradient(2px 2px at 10% 14%, rgba(255, 255, 255, .75) 0, transparent 100%),
         radial-gradient(1.6px 1.6px at 74% 18%, rgba(255, 255, 255, .72) 0, transparent 100%),
@@ -3567,7 +3591,7 @@
         linear-gradient(175deg, rgba(6, 8, 14, .995), rgba(1, 2, 6, .995));
       box-shadow:
         0 30px 56px rgba(0, 0, 0, .9),
-        0 0 42px color-mix(in srgb, var(--preview-rarity, rgba(107, 188, 255, .5)) 42%, transparent),
+        0 0 42px color-mix(in srgb, var(--preview-role, rgba(107, 188, 255, .5)) 42%, transparent),
         inset 0 0 0 1px rgba(255, 255, 255, .08),
         inset 0 -26px 46px rgba(0, 0, 0, .62);
     }
@@ -3586,7 +3610,7 @@
       height: 258px;
       object-fit: cover;
       display: block;
-      border-bottom: 2px solid color-mix(in srgb, var(--preview-rarity, rgba(107, 188, 255, .5)) 54%, rgba(173, 212, 255, .32));
+      border-bottom: 2px solid color-mix(in srgb, var(--preview-role, rgba(107, 188, 255, .5)) 54%, rgba(173, 212, 255, .32));
       background: linear-gradient(180deg, rgba(14, 24, 50, .92), rgba(6, 11, 24, .98));
       filter: saturate(1.12) contrast(1.18);
       box-shadow:
@@ -3608,7 +3632,7 @@
       color: #f5f9ff;
       text-shadow:
         0 1px 0 rgba(255, 255, 255, .2),
-        0 0 18px color-mix(in srgb, var(--preview-rarity, rgba(107, 188, 255, .5)) 46%, rgba(120, 198, 255, .28));
+        0 0 18px color-mix(in srgb, var(--preview-role, rgba(107, 188, 255, .5)) 46%, rgba(120, 198, 255, .28));
     }
     .character-preview-popover p {
       margin: 0;
@@ -3618,7 +3642,7 @@
       letter-spacing: .008em;
     }
     .character-preview-popover .preview-field-label {
-      color: color-mix(in srgb, var(--preview-rarity, rgba(107, 188, 255, .5)) 48%, #cbddf7 52%);
+      color: color-mix(in srgb, var(--preview-role, rgba(107, 188, 255, .5)) 48%, #cbddf7 52%);
       font-weight: 800;
       margin-right: 6px;
       font-size: .76rem;

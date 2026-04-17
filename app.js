@@ -146,8 +146,30 @@
     const viewAudioFondos = document.getElementById('viewAudioFondos');
     const viewAudioMixer = document.getElementById('viewAudioMixer');
 
-    function rarityClass(rareza) {
-      return `rare-${rareza.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')}`;
+    function normalizeRoleTier(value) {
+      return String(value || '')
+        .trim()
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/\s+/g, '-');
+    }
+
+    function roleTierFromData(rol, categoriaRol, rareza = '') {
+      const role = normalizeRoleTier(rol);
+      const category = normalizeRoleTier(categoriaRol);
+      if (role && category) return `${role}-${category}`;
+      const fallback = normalizeRoleTier(rareza);
+      if (fallback === 'legendario') return 'protagonista-a';
+      if (fallback === 'epico') return 'villano-b';
+      if (fallback === 'raro') return 'secundario-a';
+      if (fallback === 'comun') return 'recurrente-a';
+      if (fallback === 'bloqueado') return 'recurrente-b';
+      return 'recurrente-a';
+    }
+
+    function roleClass(rol, categoriaRol, rareza = '') {
+      return `role-${roleTierFromData(rol, categoriaRol, rareza)}`;
     }
 
     function rarityRank(rareza) {
@@ -175,13 +197,19 @@
       return maxRank >= 0 ? labels[maxRank] : 'Bloqueado';
     }
 
-    function rarityColorValue(rareza) {
-      const normalized = String(rareza || '').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-      if (normalized === 'legendario') return '#f4c45a';
-      if (normalized === 'epico') return '#b786ff';
-      if (normalized === 'raro') return '#5da8ff';
-      if (normalized === 'comun') return '#52d88a';
-      return '#8cb8ff';
+    function roleColorValue(rol, categoriaRol, rareza = '') {
+      const roleTier = roleTierFromData(rol, categoriaRol, rareza);
+      const rolePalette = {
+        'protagonista-a': '#2f7dff',
+        'protagonista-b': '#66d9ff',
+        'villano-a': '#ff4d5f',
+        'villano-b': '#a86bff',
+        'secundario-a': '#ffd54a',
+        'secundario-b': '#ff9f43',
+        'recurrente-a': '#f5fbff',
+        'recurrente-b': '#a5b0c2'
+      };
+      return rolePalette[roleTier] || '#8cb8ff';
     }
 
     function calculateActorTier({ entriesCount = 0, videosCount = 0, charactersCount = 0 } = {}) {
@@ -4369,7 +4397,7 @@
             </section>
             <aside class="hud-panel holo-card">
               <h4 class="section-title">Rareza</h4>
-              <div class="rarity-highlight ${rarityClass(video.rareza || 'Común')}">${video.rareza || 'Común'}</div>
+              <div class="rarity-highlight ${roleClass(video?.rol, video?.categoriaRol, video.rareza || 'Común')}">${video.rareza || 'Común'}</div>
               <h4 class="section-title">Universos relacionados</h4>
               <ul class="detail-list detail-list-soft">${universosRelacionados.map(u => `<li>${u}</li>`).join('') || '<li>Sin datos</li>'}</ul>
               <h4 class="section-title">Actores de doblaje</h4>
@@ -4811,9 +4839,9 @@
               const newlyUnlocked = hadPreviousState && !previousSnapshot[character.id] && character.unlocked;
               if (!character.unlocked) {
                 const rarity = character.rareza || 'Bloqueado';
-                const rarityClassName = rarityClass(rarity);
+                const rarityClassName = roleClass(character?.rol, character?.categoriaRol, rarity);
                 return `
-                  <article class="collection-card collection-character-card locked ${rarityClassName}" style="--rarity-color:${rarityColorValue(rarity)};">
+                  <article class="collection-card collection-character-card locked ${rarityClassName}" style="--rarity-color:${roleColorValue(character?.rol, character?.categoriaRol, rarity)};">
                     <div class="locked-silhouette" aria-hidden="true">
                       <div>👤</div>
                       <div class="lock-icon">🔒 BLOQUEADO</div>
@@ -4839,7 +4867,7 @@
                   <div class="card-footer">
                     <p class="meta"><small>Actor:</small>${character.actor || 'Sin actor'}</p>
                     <p class="meta"><small>Universos:</small>${character.universes.length ? character.universes.join(', ') : 'Sin universo'}</p>
-                    <span class="badge ${rarityClass(character.rareza || 'Común')}">${character.rareza || 'Común'}</span>
+                    <span class="badge ${roleClass(character?.rol, character?.categoriaRol, character.rareza || 'Común')}">${character.rareza || 'Común'}</span>
                   </div>
                 </article>
               `;
@@ -5463,7 +5491,7 @@
       popover.id = 'characterPreviewPopover';
       popover.className = 'character-preview-popover';
       popover.dataset.locked = item.unlocked ? 'false' : 'true';
-      popover.style.setProperty('--preview-rarity', rarityColorValue(item.rareza || 'Común'));
+      popover.style.setProperty('--preview-role', roleColorValue(item?.rol, item?.categoriaRol, item.rareza || 'Común'));
       popover.innerHTML = `
         <img src="${item.coverVideo ? getVideoThumbnail(item.coverVideo) : createPlaceholderCover(item.name)}" alt="Vista previa de ${item.name}">
         <div class="preview-meta">
@@ -5557,8 +5585,14 @@
       if (!cardName) return '';
       const locked = Boolean(options.locked ?? !item?.unlocked);
       const rarityValue = String(item?.rareza || item?.coverVideo?.rareza || 'Común');
-      const rarityData = rarityValue.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-      const glowColor = rarityColorValue(rarityValue);
+      const roleTier = roleTierFromData(item?.rol, item?.categoriaRol, rarityValue);
+      const [roleName, roleCategory] = roleTier.split('-');
+      const roleData = {
+        role: roleName || 'recurrente',
+        category: roleCategory || 'a',
+        tier: roleTier
+      };
+      const glowColor = roleColorValue(item?.rol, item?.categoriaRol, rarityValue);
       const floatDelay = options.floatDelay || `-${(Math.random() * 2.6).toFixed(2)}s`;
 
       const renderMedia = () => {
@@ -5589,9 +5623,11 @@
           type="button"
           class="character-gallery-card"
           data-open-character="${cardName}"
-          data-rarity="${rarityData}"
+          data-role="${roleData.role}"
+          data-role-category="${roleData.category}"
+          data-role-tier="${roleData.tier}"
           data-locked="${locked ? 'true' : 'false'}"
-          style="--rarity-glow:${glowColor}; --float-delay:${floatDelay};"
+          style="--role-glow:${glowColor}; --float-delay:${floatDelay};"
         >
           ${renderMedia()}
           <div class="meta">
@@ -5670,7 +5706,7 @@
               <div class="character-hero__content">
                 <h2 class="section-title detail-character character-hero__title">${focusedCharacter}</h2>
                 <div class="detail-meta character-hero__badges">
-                  <span class="badge character-hero__badge ${rarityClass(rareza)}">🌟 ${rareza}</span>
+                  <span class="badge character-hero__badge ${roleClass(charVideos[0]?.rol, charVideos[0]?.categoriaRol, rareza)}">🌟 ${rareza}</span>
                   ${universos.map((universe) => {
                     const universeLabel = String(universe || '').trim() || SPECIAL_UNASSIGNED_UNIVERSE;
                     return `<button type="button" class="badge character-hero__badge character-hero__badge--universes character-hero__badge--universe-red character-hero__badge--universe-link" data-open-universe-profile="${escapeHtml(universeLabel)}" aria-label="Abrir perfil del universo ${escapeHtml(universeLabel)}"><span class="character-hero__universe-name">${escapeHtml(universeLabel)}</span></button>`;
@@ -6579,7 +6615,7 @@
             characterName,
             unlocked: Boolean(relatedVideo),
             rarity,
-            rarityClassName: rarityClass(rarity),
+            rarityClassName: roleClass(relatedVideo?.rol, relatedVideo?.categoriaRol, rarity),
             video: relatedVideo || null
           };
         }),
@@ -6596,7 +6632,7 @@
             characterName,
             unlocked: false,
             rarity,
-            rarityClassName: rarityClass(rarity),
+            rarityClassName: roleClass(undefined, undefined, rarity),
             video: null
           };
         })

@@ -146,8 +146,49 @@
     const viewAudioFondos = document.getElementById('viewAudioFondos');
     const viewAudioMixer = document.getElementById('viewAudioMixer');
 
+    const LEGACY_RARITY_TO_ROLE = {
+      'Común': 'Rol A',
+      Raro: 'Rol B',
+      'Épico': 'Rol C',
+      Legendario: 'Rol D'
+    };
+    const ROLE_TO_LEGACY_RARITY = Object.fromEntries(
+      Object.entries(LEGACY_RARITY_TO_ROLE).map(([legacy, role]) => [role, legacy])
+    );
+    const ROLE_ORDER = ['Rol A', 'Rol B', 'Rol C', 'Rol D'];
+
+    function normalizeRoleValue(value) {
+      const raw = String(value || '').trim();
+      if (!raw) return 'Rol A';
+      if (ROLE_ORDER.includes(raw)) return raw;
+      return LEGACY_RARITY_TO_ROLE[raw] || 'Rol A';
+    }
+
+    function getVideoRole(video) {
+      if (!video || typeof video !== 'object') return 'Rol A';
+      if (video.rol) return normalizeRoleValue(video.rol);
+      return normalizeRoleValue(video.rareza);
+    }
+
+    function getVideoRoleCategory(video) {
+      if (!video || typeof video !== 'object') return 'Rol A';
+      return normalizeRoleValue(video.categoriaRol || video.rol || video.rareza);
+    }
+
+    function migrateVideoRoleFields(video) {
+      if (!video || typeof video !== 'object') return video;
+      const role = getVideoRole(video);
+      const roleCategory = getVideoRoleCategory(video);
+      video.rol = role;
+      video.categoriaRol = roleCategory;
+      if (!video.rareza || !String(video.rareza).trim()) {
+        video.rareza = ROLE_TO_LEGACY_RARITY[role] || 'Común';
+      }
+      return video;
+    }
+
     function rarityClass(rareza) {
-      return `rare-${rareza.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')}`;
+      return `rare-${normalizeRoleValue(rareza).toLowerCase().replace(/\s+/g, '-')}`;
     }
 
     function rarityRank(rareza) {
@@ -156,18 +197,25 @@
         .toLowerCase()
         .normalize('NFD')
         .replace(/[\u0300-\u036f]/g, '');
-      const order = { comun: 0, raro: 1, epico: 2, legendario: 3 };
-      return Object.prototype.hasOwnProperty.call(order, normalized) ? order[normalized] : -1;
+      const roleFromLegacy = {
+        comun: 'rol a',
+        raro: 'rol b',
+        epico: 'rol c',
+        legendario: 'rol d'
+      };
+      const normalizedRole = roleFromLegacy[normalized] || normalized;
+      const order = { 'rol a': 0, 'rol b': 1, 'rol c': 2, 'rol d': 3 };
+      return Object.prototype.hasOwnProperty.call(order, normalizedRole) ? order[normalizedRole] : -1;
     }
 
     function highestRarityForActorCharacter(actorName, characterName) {
-      const labels = ['Común', 'Raro', 'Épico', 'Legendario'];
+      const labels = ['Rol A', 'Rol B', 'Rol C', 'Rol D'];
       let maxRank = -1;
 
       for (const video of VIDEOS) {
         if ((video.actor_de_doblaje || 'Sin actor') === actorName &&
             (video.personaje || 'Sin personaje') === characterName) {
-          const rank = rarityRank(video.rareza || 'Común');
+          const rank = rarityRank(getVideoRole(video));
           if (rank > maxRank) maxRank = rank;
         }
       }
@@ -176,11 +224,11 @@
     }
 
     function rarityColorValue(rareza) {
-      const normalized = String(rareza || '').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-      if (normalized === 'legendario') return '#f4c45a';
-      if (normalized === 'epico') return '#b786ff';
-      if (normalized === 'raro') return '#5da8ff';
-      if (normalized === 'comun') return '#52d88a';
+      const normalized = normalizeRoleValue(rareza).toLowerCase();
+      if (normalized === 'rol d') return '#f4c45a';
+      if (normalized === 'rol c') return '#b786ff';
+      if (normalized === 'rol b') return '#5da8ff';
+      if (normalized === 'rol a') return '#52d88a';
       return '#8cb8ff';
     }
 
@@ -981,7 +1029,7 @@
         register(name, {
           unlocked: true,
           actor: video.actor_de_doblaje || 'Sin actor',
-          rareza: video.rareza || 'Común',
+          rareza: getVideoRole(video),
           universes: [...new Set(VIDEOS
             .filter(v => (v.personaje || 'Sin personaje') === name)
             .flatMap(v => getVideoUniverses(v))
@@ -1050,7 +1098,7 @@
         existingCharacterEntries.flatMap((item) => getVideoUniverses(item)),
         { fallbackToUnassigned: true }
       );
-      const inheritedRarity = existingCharacterEntries.find((item) => item.rareza)?.rareza || 'Común';
+      const inheritedRarity = getVideoRole(existingCharacterEntries.find((item) => item.rol || item.rareza));
       VIDEOS.push({
         id: `video-bloqueado-${Date.now()}-${Math.floor(Math.random() * 10000)}`,
         titulo: `Registro bloqueado de ${cleanCharacterName}`,
@@ -1249,6 +1297,7 @@
     }
 
     function saveVideos() {
+      VIDEOS.forEach((video) => migrateVideoRoleFields(video));
       localStorage.setItem(VIDEOS_STORAGE_KEY, JSON.stringify(VIDEOS));
       collectionModel = mergeModelWithLegacyVideos(collectionModel, VIDEOS);
       saveCollectionModel();
@@ -1263,13 +1312,78 @@
         if (raw) {
           const parsed = JSON.parse(raw);
           if (Array.isArray(parsed)) {
-            VIDEOS.splice(0, VIDEOS.length, ...parsed.filter(video => video && typeof video === 'object'));
+            const loadedVideos = parsed
+              .filter(video => video && typeof video === 'object')
+              .map((video) => migrateVideoRoleFields(video));
+            VIDEOS.splice(0, VIDEOS.length, ...loadedVideos);
+            localStorage.setItem(VIDEOS_STORAGE_KEY, JSON.stringify(VIDEOS));
           }
         }
       } catch (_) {
         VIDEOS.splice(0, VIDEOS.length);
       }
       buildAutoMarathonPlaylist();
+    }
+
+    function handleJsonExport() {
+      const normalizedVideos = VIDEOS.map((video) => migrateVideoRoleFields({ ...(video || {}) }));
+      const payload = {
+        meta: {
+          version: 2,
+          exportedAt: new Date().toISOString(),
+          note: 'Campos de rol: rol/categoriaRol. Compatibilidad legacy: rareza.'
+        },
+        videos: normalizedVideos,
+        universeNodes: state.universeNodes || [],
+        universeMemberships: state.universeMemberships || {},
+        blockedCharactersByActor: state.blockedCharactersByActor || {}
+      };
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = `univoicer-export-${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      URL.revokeObjectURL(url);
+    }
+
+    async function handleJsonImport(event) {
+      const input = event?.target;
+      const file = input?.files?.[0];
+      if (!file) return;
+      try {
+        const text = await file.text();
+        const parsed = JSON.parse(text);
+        const importedVideosSource = Array.isArray(parsed)
+          ? parsed
+          : Array.isArray(parsed?.videos) ? parsed.videos : [];
+        const importedVideos = importedVideosSource
+          .filter((video) => video && typeof video === 'object')
+          .map((video) => migrateVideoRoleFields({ ...video }));
+        if (!importedVideos.length) throw new Error('El archivo no contiene videos válidos.');
+        VIDEOS.splice(0, VIDEOS.length, ...importedVideos);
+        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+          if (Array.isArray(parsed.universeNodes)) state.universeNodes = normalizeUniverseNodes(parsed.universeNodes);
+          if (parsed.universeMemberships && typeof parsed.universeMemberships === 'object') {
+            state.universeMemberships = normalizeUniverseMemberships(parsed.universeMemberships);
+          }
+          if (parsed.blockedCharactersByActor && typeof parsed.blockedCharactersByActor === 'object') {
+            state.blockedCharactersByActor = parsed.blockedCharactersByActor;
+          }
+        }
+        saveVideos();
+        saveUniverseNodes();
+        saveUniverseMemberships();
+        saveBlockedCharacters();
+        refreshDependentViews();
+        alert('Importación completada.');
+      } catch (error) {
+        alert(`No se pudo importar el JSON: ${error?.message || 'Error desconocido'}`);
+      } finally {
+        if (input) input.value = '';
+      }
     }
 
 
@@ -2345,7 +2459,7 @@
       return getUniverseVideos().filter(v => {
         const m1 = state.filters.personaje === 'todos' || (v.personaje || 'Sin personaje') === state.filters.personaje;
         const m2 = state.filters.actor === 'todos' || (v.actor_de_doblaje || 'Sin actor') === state.filters.actor;
-        const m3 = state.filters.rareza === 'todos' || (v.rareza || 'Común') === state.filters.rareza;
+        const m3 = state.filters.rareza === 'todos' || getVideoRole(v) === state.filters.rareza;
         return m1 && m2 && m3;
       });
     }
@@ -3666,7 +3780,7 @@
       const universeMap = groupByUniverse();
       const selectedUniverseKey = normalizeUniverseName(state.universe || '');
       const universeData = universeMap[selectedUniverseKey] || { totalCharacters: 0, unlockedCharacters: 0, completion: 0, state: 'incomplete' };
-      const rarezas = ['Común', 'Raro', 'Épico', 'Legendario'];
+      const rarezas = ['Rol A', 'Rol B', 'Rol C', 'Rol D'];
       const universeCharacters = [...new Set(videos.map(v => String(v.personaje || '').trim()).filter(Boolean))]
         .sort((a, b) => a.localeCompare(b, 'es', { sensitivity: 'base' }));
       const defaultCharacterForVideo = universeCharacters[0] || '';
@@ -3864,8 +3978,8 @@
             <label>Nombre del Personaje (Requerido)
               <input type="text" name="personaje" required placeholder="Ej. Gokú">
             </label>
-            <label>Rareza
-              <select name="rareza">
+            <label>Rol
+              <select name="rol">
                 ${rarezas.map(r => `<option value="${r}">${r}</option>`).join('')}
               </select>
             </label>
@@ -3898,7 +4012,7 @@
               ${groupedCharacterCards.map(item => renderCharacterGalleryCard({
                 name: item.characterName,
                 coverVideo: item.coverVideo,
-                rareza: item.coverVideo?.rareza || 'Común',
+                rareza: getVideoRole(item.coverVideo),
                 unlocked: item.unlocked
               }, { locked: !item.unlocked })).join('') || '<p class="muted">No hay resultados con estos filtros.</p>'}
             </section>
@@ -3915,7 +4029,7 @@
           <label>Buscar actor
             <input id="searchActor" type="search" value="${state.search.actor}" placeholder="Ej. Mario Castañeda">
           </label>
-          <label>Rareza
+          <label>Rol
             <select id="filterRarity">
               <option value="todos">Todas</option>
               ${rarezas.map(r => `<option value="${r}" ${state.filters.rareza === r ? 'selected' : ''}>${r}</option>`).join('')}
@@ -4163,7 +4277,7 @@
             return;
           }
 
-          const rarezaValue = String(formData.get('rareza') || 'Común');
+          const roleValue = normalizeRoleValue(formData.get('rol') || formData.get('rareza') || 'Rol A');
           const rawUrl = String(formData.get('url_youtube') || '').trim();
           const normalizedUrl = rawUrl ? normalizeYoutubeUrl(rawUrl) : '';
           if (rawUrl && !normalizedUrl) {
@@ -4200,7 +4314,9 @@
               personaje: characterName,
               actor_de_doblaje: actorItem,
               url_youtube: unlocked ? normalizedUrl : '',
-              rareza: rarezaValue,
+              rol: roleValue,
+              categoriaRol: roleValue,
+              rareza: ROLE_TO_LEGACY_RARITY[roleValue] || 'Común',
               thumbnail: unlocked
                 ? (metadata?.thumbnail || createPlaceholderCover(characterName))
                 : createPlaceholderCover(state.universe)
@@ -4254,7 +4370,9 @@
           url_youtube: normalizedUrl,
           thumbnail: metadata.thumbnail,
           titulo: metadata.title,
-          rareza: String(formData.get('rareza') || 'Común')
+          rol: normalizeRoleValue(formData.get('rol') || formData.get('rareza') || 'Rol A'),
+          categoriaRol: normalizeRoleValue(formData.get('rol') || formData.get('rareza') || 'Rol A'),
+          rareza: ROLE_TO_LEGACY_RARITY[normalizeRoleValue(formData.get('rol') || formData.get('rareza') || 'Rol A')] || 'Común'
         };
         VIDEOS.push(newVideo);
         unlockBlockedCharacterForActor(newVideo.actor_de_doblaje, newVideo.personaje);
@@ -4368,8 +4486,8 @@
               <p class="section-note">${videoNote}</p>
             </section>
             <aside class="hud-panel holo-card">
-              <h4 class="section-title">Rareza</h4>
-              <div class="rarity-highlight ${rarityClass(video.rareza || 'Común')}">${video.rareza || 'Común'}</div>
+              <h4 class="section-title">Rol</h4>
+              <div class="rarity-highlight ${rarityClass(getVideoRole(video))}">${getVideoRole(video)}</div>
               <h4 class="section-title">Universos relacionados</h4>
               <ul class="detail-list detail-list-soft">${universosRelacionados.map(u => `<li>${u}</li>`).join('') || '<li>Sin datos</li>'}</ul>
               <h4 class="section-title">Actores de doblaje</h4>
@@ -4429,14 +4547,14 @@
       if (!normalizedCharacter) return;
 
       const characterVideos = VIDEOS.filter((item) => normalizeName(item.personaje || '') === normalizedCharacter);
-      const currentRarity = characterVideos[0]?.rareza || 'Común';
+      const currentRarity = getVideoRole(characterVideos[0]);
       const currentUniverses = getCharacterUniverseList(focusedCharacter, { fallbackToUnassigned: false });
       const currentActors = [...new Set(characterVideos.map((item) => String(item.actor_de_doblaje || 'Sin actor').trim()).filter(Boolean))];
       const rarityOptions = [...new Set([
         ...VIDEOS
-          .map((item) => String(item.rareza || '').trim())
+          .map((item) => getVideoRole(item))
           .filter(Boolean),
-        String(currentRarity || 'Común').trim() || 'Común'
+        String(currentRarity || 'Rol A').trim() || 'Rol A'
       ])].sort((a, b) => {
         const rankDiff = rarityRank(b) - rarityRank(a);
         if (rankDiff !== 0) return rankDiff;
@@ -4459,7 +4577,7 @@
                 <label>Nombre del personaje
                   <input type="text" name="characterName" value="${escapeHtml(focusedCharacter)}" required>
                 </label>
-                <label>Rareza
+                <label>Rol
                   <select name="characterRarity">
                     ${rarityOptions.map((option) => `<option value="${escapeHtml(option)}" ${option === currentRarity ? 'selected' : ''}>${escapeHtml(option)}</option>`).join('')}
                   </select>
@@ -4506,7 +4624,7 @@
         event.preventDefault();
         const formData = new FormData(event.currentTarget);
         const nextCharacterName = String(formData.get('characterName') || '').trim();
-        const nextRarity = String(formData.get('characterRarity') || '').trim() || 'Común';
+        const nextRarity = normalizeRoleValue(formData.get('characterRarity') || 'Rol A');
         const nextActors = [...new Set(
           formData.getAll('characterActors').map((item) => String(item || '').trim()).filter(Boolean)
         )];
@@ -4733,15 +4851,15 @@
     }
 
     function rarezasPermitidas(value) {
-      const allowed = ['Común', 'Raro', 'Épico', 'Legendario'];
-      return allowed.includes(value) ? value : 'Común';
+      const normalized = normalizeRoleValue(value);
+      return ROLE_ORDER.includes(normalized) ? normalized : 'Rol A';
     }
 
     function renderAchievementsView() {
       const universeMap = groupByUniverse();
       const universeCompleted = Object.values(universeMap).some(data => data.totalCharacters >= 3);
       const tenSameUniverse = Object.values(universeMap).some(data => data.totalCharacters >= 10);
-      const fiveLegendary = VIDEOS.filter(v => v.rareza === 'Legendario').length >= 5;
+      const fiveLegendary = VIDEOS.filter(v => getVideoRole(v) === 'Rol D').length >= 5;
 
       const achievements = [
         {
@@ -4755,8 +4873,8 @@
           unlocked: tenSameUniverse
         },
         {
-          title: '5 videos legendarios',
-          description: 'Consigue 5 videos con rareza Legendario.',
+          title: '5 videos Rol D',
+          description: 'Consigue 5 videos con rol Rol D.',
           unlocked: fiveLegendary
         }
       ];
@@ -4810,7 +4928,7 @@
               const hadPreviousState = Object.prototype.hasOwnProperty.call(previousSnapshot, character.id);
               const newlyUnlocked = hadPreviousState && !previousSnapshot[character.id] && character.unlocked;
               if (!character.unlocked) {
-                const rarity = character.rareza || 'Bloqueado';
+                const rarity = character.rareza === 'Bloqueado' ? 'Bloqueado' : getVideoRole(character);
                 const rarityClassName = rarityClass(rarity);
                 return `
                   <article class="collection-card collection-character-card locked ${rarityClassName}" style="--rarity-color:${rarityColorValue(rarity)};">
@@ -4820,7 +4938,7 @@
                     </div>
                     <div class="card-footer">
                       <p class="meta character-name">${character.name}</p>
-                      <p class="meta"><small>Rareza:</small><span class="badge ${rarityClassName}">${rarity}</span></p>
+                      <p class="meta"><small>Rol:</small><span class="badge ${rarityClassName}">${rarity}</span></p>
                       <p class="meta"><small>Estado:</small>🔒 Bloqueado</p>
                       <p class="meta"><small>Actor:</small>${character.actor || 'Sin actor'}</p>
                     </div>
@@ -4839,7 +4957,7 @@
                   <div class="card-footer">
                     <p class="meta"><small>Actor:</small>${character.actor || 'Sin actor'}</p>
                     <p class="meta"><small>Universos:</small>${character.universes.length ? character.universes.join(', ') : 'Sin universo'}</p>
-                    <span class="badge ${rarityClass(character.rareza || 'Común')}">${character.rareza || 'Común'}</span>
+                    <span class="badge ${rarityClass(getVideoRole(character))}">${getVideoRole(character)}</span>
                   </div>
                 </article>
               `;
@@ -4880,13 +4998,15 @@
     }) {
       const previousNormalized = normalizeName(currentCharacterName || '');
       const canonicalName = String(nextCharacterName || '').trim();
-      const canonicalRarity = String(nextRarity || '').trim() || 'Común';
+      const canonicalRarity = normalizeRoleValue(nextRarity || 'Rol A');
       const canonicalUniverses = normalizeUniverseList(nextUniverses, { fallbackToUnassigned: true });
 
       VIDEOS.forEach((video) => {
         if (normalizeName(video.personaje || '') !== previousNormalized) return;
         video.personaje = canonicalName;
-        video.rareza = canonicalRarity;
+        video.rol = canonicalRarity;
+        video.categoriaRol = canonicalRarity;
+        video.rareza = ROLE_TO_LEGACY_RARITY[canonicalRarity] || 'Común';
         video.universo = [...canonicalUniverses];
       });
 
@@ -4960,7 +5080,7 @@
           const universes = getCharacterUniverseList(item.name, { fallbackToUnassigned: false });
           const unlockedVersion = item.versions.find(video => hasGreetingVideo(video));
           const sourceVersion = unlockedVersion || item.versions[0] || null;
-          const rarity = rarezasPermitidas(sourceVersion?.rareza || 'Común');
+          const rarity = rarezasPermitidas(sourceVersion?.rol || sourceVersion?.rareza || 'Rol A');
           return {
             ...item,
             actorCount: unlockedByActor.size + blockedActors.length,
@@ -5374,7 +5494,7 @@
     function submitNewCharacterForm(formEl) {
       const formData = new FormData(formEl);
       const characterName = String(formData.get('characterName') || '').trim();
-      const rarity = String(formData.get('characterRarity') || 'Común');
+      const rarity = normalizeRoleValue(formData.get('characterRarity') || 'Rol A');
       const actorsInput = [...new Set(
         formData.getAll('characterActors')
           .map((value) => String(value || '').trim())
@@ -5463,12 +5583,12 @@
       popover.id = 'characterPreviewPopover';
       popover.className = 'character-preview-popover';
       popover.dataset.locked = item.unlocked ? 'false' : 'true';
-      popover.style.setProperty('--preview-rarity', rarityColorValue(item.rareza || 'Común'));
+      popover.style.setProperty('--preview-rarity', rarityColorValue(getVideoRole(item)));
       popover.innerHTML = `
         <img src="${item.coverVideo ? getVideoThumbnail(item.coverVideo) : createPlaceholderCover(item.name)}" alt="Vista previa de ${item.name}">
         <div class="preview-meta">
           <h3>${item.name}</h3>
-          <p><span class="preview-field-label">Rareza</span><span class="preview-field-value">${item.rareza || 'Común'}</span></p>
+          <p><span class="preview-field-label">Categoría</span><span class="preview-field-value">${getVideoRole(item)}</span></p>
           <p><span class="preview-field-label">Actores</span><span class="preview-field-value">${item.actors.length ? item.actors.join(', ') : 'Sin actores asociados'}</span></p>
           <p><span class="preview-field-label">Universos</span><span class="preview-field-value">${item.universes.length ? item.universes.join(', ') : 'Sin universo'}</span></p>
         </div>
@@ -5556,7 +5676,7 @@
       const cardName = String(item?.name || item?.characterName || '').trim();
       if (!cardName) return '';
       const locked = Boolean(options.locked ?? !item?.unlocked);
-      const rarityValue = String(item?.rareza || item?.coverVideo?.rareza || 'Común');
+      const rarityValue = getVideoRole(item) || getVideoRole(item?.coverVideo);
       const rarityData = rarityValue.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
       const glowColor = rarityColorValue(rarityValue);
       const floatDelay = options.floatDelay || `-${(Math.random() * 2.6).toFixed(2)}s`;
@@ -5610,7 +5730,7 @@
         // Datos del personaje
         const normalizedCharacter = normalizeName(focusedCharacter);
         const charVideos = VIDEOS.filter(v => normalizeName(v.personaje || '') === normalizedCharacter);
-        const rareza = charVideos[0]?.rareza || 'Común';
+        const rareza = getVideoRole(charVideos[0]);
         const universos = getCharacterUniverseList(focusedCharacter, { fallbackToUnassigned: false });
         const realVideos = charVideos.filter(v => hasGreetingVideo(v));
         
@@ -5622,8 +5742,8 @@
           .map(item => ({ ...item, isUnlocked: !item.locked && hasGreetingVideo(item.video) }))
           .sort((a, b) => a.actorName.localeCompare(b.actorName, 'es', { sensitivity: 'base' }));
         const rarityOptions = [...new Set([
-          ...VIDEOS.map((video) => String(video.rareza || '').trim()).filter(Boolean),
-          String(rareza || 'Común').trim() || 'Común'
+          ...VIDEOS.map((video) => getVideoRole(video)).filter(Boolean),
+          String(rareza || 'Rol A').trim() || 'Rol A'
         ])].sort((a, b) => {
           const rankDiff = rarityRank(b) - rarityRank(a);
           if (rankDiff !== 0) return rankDiff;
@@ -5689,7 +5809,7 @@
                 <label>Nombre del personaje
                   <input type="text" name="characterName" value="${focusedCharacter}">
                 </label>
-                <label>Rareza
+                <label>Rol
                   <select name="characterRarity">
                     ${rarityOptions.map((option) => `<option value="${escapeHtml(option)}" ${option === rareza ? 'selected' : ''}>${escapeHtml(option)}</option>`).join('')}
                   </select>
@@ -5972,18 +6092,18 @@
       const indexUniverseFilters = getUniverseOptionsForIndiceFilters();
       const indexActorFilters = getActorOptionsForIndiceFilters();
       const rarityGroupLabels = {
-        Legendario: 'Legendarios',
-        'Épico': 'Épicos',
-        Raro: 'Raros',
-        'Común': 'Comunes'
+        'Rol D': 'Roles D',
+        'Rol C': 'Roles C',
+        'Rol B': 'Roles B',
+        'Rol A': 'Roles A'
       };
       const groupedIndexItems = indexItems.reduce((acc, item) => {
-        const rarity = item.rareza || 'Común';
+        const rarity = getVideoRole(item);
         if (!acc.has(rarity)) acc.set(rarity, []);
         acc.get(rarity).push(item);
         return acc;
       }, new Map());
-      const rarityRenderOrder = ['Legendario', 'Épico', 'Raro', 'Común'];
+      const rarityRenderOrder = ['Rol D', 'Rol C', 'Rol B', 'Rol A'];
       viewIndice.innerHTML = `
         <section class="mock-shell">
           <div class="indice-toolbar">
@@ -5995,12 +6115,12 @@
               <label>Nombre del personaje
                 <input type="text" name="characterName" placeholder="Ej. Homero Simpson" required>
               </label>
-              <label>Rareza
+              <label>Rol
                 <select name="characterRarity">
-                  <option value="Común">Común</option>
-                  <option value="Raro">Raro</option>
-                  <option value="Épico">Épico</option>
-                  <option value="Legendario">Legendario</option>
+                  <option value="Rol A">Rol A</option>
+                  <option value="Rol B">Rol B</option>
+                  <option value="Rol C">Rol C</option>
+                  <option value="Rol D">Rol D</option>
                 </select>
               </label>
               <label>Actores de doblaje (opcional)
@@ -6429,14 +6549,14 @@
 
     function renderRarezasView() {
       const levels = [
-        ['Común', 'Estabilidad base'],
-        ['Raro', 'Carga amplificada'],
-        ['Épico', 'Pulso de energía avanzada'],
-        ['Legendario', 'Núcleo máximo']
+        ['Rol A', 'Categoría base'],
+        ['Rol B', 'Categoría avanzada'],
+        ['Rol C', 'Categoría élite'],
+        ['Rol D', 'Categoría máxima']
       ];
       viewRarezas.innerHTML = `
         <section class="mock-shell toon-panel">
-          <h2 class="toon-title">Rarezas por nivel de energía</h2>
+          <h2 class="toon-title">Roles por nivel de energía</h2>
           <div class="mock-row">
             ${levels.map(([name, desc]) => `<article class="mock-box toon-panel"><h3 class="toon-title"><span class="toon-chip">${name}</span></h3><p class="muted">${desc}</p></article>`).join('')}
           </div>
@@ -6472,7 +6592,7 @@
 
         const existingCharacterEntries = VIDEOS.filter((video) => normalizeName(video.personaje || '') === normalizedCharacterName);
         const inheritedUniverses = [...new Set(existingCharacterEntries.flatMap(item => getVideoUniverses(item)).filter(Boolean))];
-        const inheritedRarity = rarezasPermitidas(existingCharacterEntries.find(item => item.rareza)?.rareza || 'Común');
+        const inheritedRarity = rarezasPermitidas(existingCharacterEntries.find(item => item.rol || item.rareza)?.rol || existingCharacterEntries.find(item => item.rol || item.rareza)?.rareza || 'Rol A');
         VIDEOS.push({
           id: `video-bloqueado-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
           titulo: `Registro bloqueado de ${canonicalCharacterName}`,
@@ -6587,11 +6707,11 @@
           const normalizedCharacter = normalizeName(characterName);
           const matchingEntries = VIDEOS.filter((video) => normalizeName(video.personaje || 'Sin personaje') === normalizedCharacter);
           const rarityRankBest = matchingEntries.reduce((bestRank, video) => {
-            const videoRank = rarityRank(rarezasPermitidas(video.rareza || 'Común'));
+            const videoRank = rarityRank(rarezasPermitidas(getVideoRole(video)));
             return videoRank > bestRank ? videoRank : bestRank;
           }, -1);
-          const rarityLabels = ['Común', 'Raro', 'Épico', 'Legendario'];
-          const rarity = rarityRankBest >= 0 ? rarezasPermitidas(rarityLabels[rarityRankBest]) : 'Común';
+          const rarityLabels = ['Rol A', 'Rol B', 'Rol C', 'Rol D'];
+          const rarity = rarityRankBest >= 0 ? rarezasPermitidas(rarityLabels[rarityRankBest]) : 'Rol A';
           return {
             characterName,
             unlocked: false,
@@ -7011,7 +7131,7 @@
           <div class="mock-row">
             <article class="kpi toon-kpi"><strong>KPI 1</strong><p class="muted">Conversión mock: 24%</p></article>
             <article class="kpi toon-kpi"><strong>KPI 2</strong><p class="muted">Retención mock: 72%</p></article>
-            <article class="kpi toon-kpi"><strong>KPI 3</strong><p class="muted">Rareza alta mock: 19%</p></article>
+            <article class="kpi toon-kpi"><strong>KPI 3</strong><p class="muted">Rol alto mock: 19%</p></article>
           </div>
           <div class="mock-row">
             <div class="mock-box">Placeholder gráfico de líneas</div>
@@ -7049,13 +7169,15 @@
         <section class="mock-shell audio-library-shell">
           <h2>Configuración</h2>
           <div class="mock-row">
-            <button class="neon-btn toon-btn">Importar JSON</button>
-            <button class="neon-btn toon-btn">Exportar JSON</button>
+            <button class="neon-btn toon-btn" type="button" data-import-json-btn>Importar JSON</button>
+            <button class="neon-btn toon-btn" type="button" data-export-json-btn>Exportar JSON</button>
+            <input type="file" accept="application/json" data-import-json-input hidden>
             <div class="mock-box">
               <p>Tema</p>
               <div class="theme-toggle" aria-hidden="true"></div>
             </div>
           </div>
+          <p class="muted">JSON v2: usa <code>rol</code> y <code>categoriaRol</code>. También se admite formato legacy con <code>rareza</code>.</p>
           <div class="audio-library-grid">
             ${categories.map(({ key, label, buttonLabel }) => {
               const status = state.uploadStatusByCategory?.[key] || { loading: false, error: '', success: '' };
@@ -7090,6 +7212,12 @@
           handleAudioLibraryFileSelected(event, category);
         });
       });
+      const importBtn = viewConfig.querySelector('[data-import-json-btn]');
+      const exportBtn = viewConfig.querySelector('[data-export-json-btn]');
+      const importInput = viewConfig.querySelector('[data-import-json-input]');
+      importBtn?.addEventListener('click', () => importInput?.click());
+      importInput?.addEventListener('change', (event) => handleJsonImport(event));
+      exportBtn?.addEventListener('click', () => handleJsonExport());
     }
 
     function renderAudioGalleryView() {

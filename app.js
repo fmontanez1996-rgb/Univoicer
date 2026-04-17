@@ -1087,7 +1087,7 @@
         register(name, {
           unlocked: true,
           actor: video.actor_de_doblaje || 'Sin actor',
-          rareza: video.rareza || 'Común',
+          rareza: getVideoRole(video),
           universes: [...new Set(VIDEOS
             .filter(v => (v.personaje || 'Sin personaje') === name)
             .flatMap(v => getVideoUniverses(v))
@@ -1385,6 +1385,67 @@
         VIDEOS.splice(0, VIDEOS.length);
       }
       buildAutoMarathonPlaylist();
+    }
+
+    function handleJsonExport() {
+      const normalizedVideos = VIDEOS.map((video) => migrateVideoRoleFields({ ...(video || {}) }));
+      const payload = {
+        meta: {
+          version: 2,
+          exportedAt: new Date().toISOString(),
+          note: 'Campos de rol: rol/categoriaRol. Compatibilidad legacy: rareza.'
+        },
+        videos: normalizedVideos,
+        universeNodes: state.universeNodes || [],
+        universeMemberships: state.universeMemberships || {},
+        blockedCharactersByActor: state.blockedCharactersByActor || {}
+      };
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = `univoicer-export-${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      URL.revokeObjectURL(url);
+    }
+
+    async function handleJsonImport(event) {
+      const input = event?.target;
+      const file = input?.files?.[0];
+      if (!file) return;
+      try {
+        const text = await file.text();
+        const parsed = JSON.parse(text);
+        const importedVideosSource = Array.isArray(parsed)
+          ? parsed
+          : Array.isArray(parsed?.videos) ? parsed.videos : [];
+        const importedVideos = importedVideosSource
+          .filter((video) => video && typeof video === 'object')
+          .map((video) => migrateVideoRoleFields({ ...video }));
+        if (!importedVideos.length) throw new Error('El archivo no contiene videos válidos.');
+        VIDEOS.splice(0, VIDEOS.length, ...importedVideos);
+        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+          if (Array.isArray(parsed.universeNodes)) state.universeNodes = normalizeUniverseNodes(parsed.universeNodes);
+          if (parsed.universeMemberships && typeof parsed.universeMemberships === 'object') {
+            state.universeMemberships = normalizeUniverseMemberships(parsed.universeMemberships);
+          }
+          if (parsed.blockedCharactersByActor && typeof parsed.blockedCharactersByActor === 'object') {
+            state.blockedCharactersByActor = parsed.blockedCharactersByActor;
+          }
+        }
+        saveVideos();
+        saveUniverseNodes();
+        saveUniverseMemberships();
+        saveBlockedCharacters();
+        refreshDependentViews();
+        alert('Importación completada.');
+      } catch (error) {
+        alert(`No se pudo importar el JSON: ${error?.message || 'Error desconocido'}`);
+      } finally {
+        if (input) input.value = '';
+      }
     }
 
 
@@ -4034,7 +4095,7 @@
               ${groupedCharacterCards.map(item => renderCharacterGalleryCard({
                 name: item.characterName,
                 coverVideo: item.coverVideo,
-                rareza: item.coverVideo?.rareza || 'Común',
+                rareza: getVideoRole(item.coverVideo),
                 unlocked: item.unlocked
               }, { locked: !item.unlocked })).join('') || '<p class="muted">No hay resultados con estos filtros.</p>'}
             </section>
@@ -4956,7 +5017,7 @@
               const hadPreviousState = Object.prototype.hasOwnProperty.call(previousSnapshot, character.id);
               const newlyUnlocked = hadPreviousState && !previousSnapshot[character.id] && character.unlocked;
               if (!character.unlocked) {
-                const rarity = character.rareza || 'Bloqueado';
+                const rarity = character.rareza === 'Bloqueado' ? 'Bloqueado' : getVideoRole(character);
                 const rarityClassName = rarityClass(rarity);
                 const roleData = LEGACY_RARITY_TO_ROLE[rarity] || { rol: 'Bloqueado', categoriaRol: '' };
                 return `
@@ -6605,14 +6666,14 @@
 
     function renderRarezasView() {
       const levels = [
-        ['Común', 'Estabilidad base'],
-        ['Raro', 'Carga amplificada'],
-        ['Épico', 'Pulso de energía avanzada'],
-        ['Legendario', 'Núcleo máximo']
+        ['Rol A', 'Categoría base'],
+        ['Rol B', 'Categoría avanzada'],
+        ['Rol C', 'Categoría élite'],
+        ['Rol D', 'Categoría máxima']
       ];
       viewRarezas.innerHTML = `
         <section class="mock-shell toon-panel">
-          <h2 class="toon-title">Rarezas por nivel de energía</h2>
+          <h2 class="toon-title">Roles por nivel de energía</h2>
           <div class="mock-row">
             ${levels.map(([name, desc]) => `<article class="mock-box toon-panel"><h3 class="toon-title"><span class="toon-chip">${name}</span></h3><p class="muted">${desc}</p></article>`).join('')}
           </div>
@@ -7194,7 +7255,7 @@
           <div class="mock-row">
             <article class="kpi toon-kpi"><strong>KPI 1</strong><p class="muted">Conversión mock: 24%</p></article>
             <article class="kpi toon-kpi"><strong>KPI 2</strong><p class="muted">Retención mock: 72%</p></article>
-            <article class="kpi toon-kpi"><strong>KPI 3</strong><p class="muted">Rareza alta mock: 19%</p></article>
+            <article class="kpi toon-kpi"><strong>KPI 3</strong><p class="muted">Rol alto mock: 19%</p></article>
           </div>
           <div class="mock-row">
             <div class="mock-box">Placeholder gráfico de líneas</div>
@@ -7232,13 +7293,15 @@
         <section class="mock-shell audio-library-shell">
           <h2>Configuración</h2>
           <div class="mock-row">
-            <button class="neon-btn toon-btn">Importar JSON</button>
-            <button class="neon-btn toon-btn">Exportar JSON</button>
+            <button class="neon-btn toon-btn" type="button" data-import-json-btn>Importar JSON</button>
+            <button class="neon-btn toon-btn" type="button" data-export-json-btn>Exportar JSON</button>
+            <input type="file" accept="application/json" data-import-json-input hidden>
             <div class="mock-box">
               <p>Tema</p>
               <div class="theme-toggle" aria-hidden="true"></div>
             </div>
           </div>
+          <p class="muted">JSON v2: usa <code>rol</code> y <code>categoriaRol</code>. También se admite formato legacy con <code>rareza</code>.</p>
           <div class="audio-library-grid">
             ${categories.map(({ key, label, buttonLabel }) => {
               const status = state.uploadStatusByCategory?.[key] || { loading: false, error: '', success: '' };
@@ -7273,6 +7336,12 @@
           handleAudioLibraryFileSelected(event, category);
         });
       });
+      const importBtn = viewConfig.querySelector('[data-import-json-btn]');
+      const exportBtn = viewConfig.querySelector('[data-export-json-btn]');
+      const importInput = viewConfig.querySelector('[data-import-json-input]');
+      importBtn?.addEventListener('click', () => importInput?.click());
+      importInput?.addEventListener('change', (event) => handleJsonImport(event));
+      exportBtn?.addEventListener('click', () => handleJsonExport());
     }
 
     function renderAudioGalleryView() {

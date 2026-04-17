@@ -111,6 +111,10 @@
     const WORLD_NODE_HALF_HEIGHT = 82;
     const WORLD_ORBIT_BASE_RADIUS = 190;
     const WORLD_ORBIT_MIN_CENTER_DISTANCE = 230;
+    const ALLOWED_ROLES = ['Protagonista', 'Secundario', 'Recurrente', 'Villano'];
+    const ALLOWED_ROLE_CATEGORIES = ['A', 'B'];
+    const DEFAULT_ROLE = 'Protagonista';
+    const DEFAULT_ROLE_CATEGORY = 'A';
     let firebaseDb = null;
     let firebaseStorage = null;
     let cloudSyncTimer = null;
@@ -221,6 +225,29 @@
       if (safeUnlockedCount >= 2) return ACTOR_TIERS.destacado;
       if (safeUnlockedCount === 1) return ACTOR_TIERS.desbloqueado;
       return ACTOR_TIERS.bloqueado;
+    }
+
+    function normalizeRole(value) {
+      const cleanValue = String(value || '').trim();
+      return ALLOWED_ROLES.includes(cleanValue) ? cleanValue : DEFAULT_ROLE;
+    }
+
+    function normalizeRoleCategory(value) {
+      const cleanValue = String(value || '').trim().toUpperCase();
+      return ALLOWED_ROLE_CATEGORIES.includes(cleanValue) ? cleanValue : DEFAULT_ROLE_CATEGORY;
+    }
+
+    function roleLabel(rol, categoriaRol) {
+      return `${normalizeRole(rol)} ${normalizeRoleCategory(categoriaRol)}`.trim();
+    }
+
+    function normalizeVideoRoleData(video) {
+      if (!video || typeof video !== 'object') return video;
+      const normalizedRole = normalizeRole(video.rol || video.role);
+      const normalizedCategory = normalizeRoleCategory(video.categoriaRol || video.roleCategory);
+      video.rol = normalizedRole;
+      video.categoriaRol = normalizedCategory;
+      return video;
     }
 
     function groupByUniverse() {
@@ -1054,7 +1081,8 @@
         existingCharacterEntries.flatMap((item) => getVideoUniverses(item)),
         { fallbackToUnassigned: true }
       );
-      const inheritedRarity = existingCharacterEntries.find((item) => item.rareza)?.rareza || 'Común';
+      const inheritedRole = normalizeRole(existingCharacterEntries.find((item) => item.rol)?.rol);
+      const inheritedRoleCategory = normalizeRoleCategory(existingCharacterEntries.find((item) => item.categoriaRol)?.categoriaRol);
       VIDEOS.push({
         id: `video-bloqueado-${Date.now()}-${Math.floor(Math.random() * 10000)}`,
         titulo: `Registro bloqueado de ${cleanCharacterName}`,
@@ -1062,7 +1090,8 @@
         personaje: cleanCharacterName,
         actor_de_doblaje: cleanActorName,
         url_youtube: '',
-        rareza: inheritedRarity,
+        rol: inheritedRole,
+        categoriaRol: inheritedRoleCategory,
         thumbnail: createPlaceholderCover(cleanCharacterName)
       });
       return true;
@@ -1253,6 +1282,7 @@
     }
 
     function saveVideos() {
+      VIDEOS.forEach((video) => normalizeVideoRoleData(video));
       localStorage.setItem(VIDEOS_STORAGE_KEY, JSON.stringify(VIDEOS));
       collectionModel = mergeModelWithLegacyVideos(collectionModel, VIDEOS);
       saveCollectionModel();
@@ -1267,7 +1297,13 @@
         if (raw) {
           const parsed = JSON.parse(raw);
           if (Array.isArray(parsed)) {
-            VIDEOS.splice(0, VIDEOS.length, ...parsed.filter(video => video && typeof video === 'object'));
+            VIDEOS.splice(
+              0,
+              VIDEOS.length,
+              ...parsed
+                .filter(video => video && typeof video === 'object')
+                .map((video) => normalizeVideoRoleData(video))
+            );
           }
         }
       } catch (_) {
@@ -1478,7 +1514,7 @@
     }
 
     function persistVideosLocally(nextVideos, nextModel) {
-      VIDEOS.splice(0, VIDEOS.length, ...nextVideos);
+      VIDEOS.splice(0, VIDEOS.length, ...(Array.isArray(nextVideos) ? nextVideos.map((video) => normalizeVideoRoleData(video)) : []));
       collectionModel = parseModelFromStorage(nextModel) || createEmptyCollectionModel();
       localStorage.setItem(VIDEOS_STORAGE_KEY, JSON.stringify(VIDEOS));
       localStorage.setItem(COLLECTION_MODEL_STORAGE_KEY, JSON.stringify(collectionModel));
@@ -2214,7 +2250,13 @@
           localStorage.setItem(UNIVERSE_MEMBERSHIPS_STORAGE_KEY, JSON.stringify(state.universeMemberships));
         }
         if (Array.isArray(data.videos)) {
-          VIDEOS.splice(0, VIDEOS.length, ...data.videos.filter(video => video && typeof video === 'object'));
+          VIDEOS.splice(
+            0,
+            VIDEOS.length,
+            ...data.videos
+              .filter(video => video && typeof video === 'object')
+              .map((video) => normalizeVideoRoleData(video))
+          );
           localStorage.setItem(VIDEOS_STORAGE_KEY, JSON.stringify(VIDEOS));
         }
         if (data.collectionModel && typeof data.collectionModel === 'object') {
@@ -4188,8 +4230,6 @@
             return;
           }
 
-          const rolValue = String(formData.get('rol') || DEFAULT_ROLE);
-          const categoriaRolValue = String(formData.get('categoriaRol') || DEFAULT_ROLE_CATEGORY);
           const rawUrl = String(formData.get('url_youtube') || '').trim();
           const normalizedUrl = rawUrl ? normalizeYoutubeUrl(rawUrl) : '';
           if (rawUrl && !normalizedUrl) {
@@ -4226,8 +4266,8 @@
               personaje: characterName,
               actor_de_doblaje: actorItem,
               url_youtube: unlocked ? normalizedUrl : '',
-              rol: rolValue,
-              categoriaRol: categoriaRolValue,
+              rol: DEFAULT_ROLE,
+              categoriaRol: DEFAULT_ROLE_CATEGORY,
               thumbnail: unlocked
                 ? (metadata?.thumbnail || createPlaceholderCover(characterName))
                 : createPlaceholderCover(state.universe)
@@ -4284,8 +4324,8 @@
           url_youtube: normalizedUrl,
           thumbnail: metadata.thumbnail,
           titulo: metadata.title,
-          rol: getVideoRole(selectedCharacterVideos[0]),
-          categoriaRol: getVideoRoleCategory(selectedCharacterVideos[0])
+          rol: DEFAULT_ROLE,
+          categoriaRol: DEFAULT_ROLE_CATEGORY
         };
         VIDEOS.push(newVideo);
         unlockBlockedCharacterForActor(newVideo.actor_de_doblaje, newVideo.personaje);
@@ -4536,8 +4576,6 @@
         event.preventDefault();
         const formData = new FormData(event.currentTarget);
         const nextCharacterName = String(formData.get('characterName') || '').trim();
-        const nextRole = String(formData.get('characterRole') || '').trim() || DEFAULT_ROLE;
-        const nextRoleCategory = String(formData.get('characterRoleCategory') || '').trim() || DEFAULT_ROLE_CATEGORY;
         const nextActors = [...new Set(
           formData.getAll('characterActors').map((item) => String(item || '').trim()).filter(Boolean)
         )];
@@ -4548,8 +4586,8 @@
 
         const { canonicalName, canonicalRole, canonicalRoleCategory, canonicalUniverses } = updateCharacterMetadata(focusedCharacter, {
           nextCharacterName,
-          nextRole,
-          nextRoleCategory,
+          nextRole: DEFAULT_ROLE,
+          nextRoleCategory: DEFAULT_ROLE_CATEGORY,
           nextUniverses
         });
 
@@ -4718,7 +4756,8 @@
           personaje: characterName,
           actor_de_doblaje: canonicalActor,
           url_youtube: '',
-          rareza: 'Común',
+          rol: DEFAULT_ROLE,
+          categoriaRol: DEFAULT_ROLE_CATEGORY,
           thumbnail: createPlaceholderCover(baseUniverses[0] || 'Universo')
         });
         blockCharacterForActor(canonicalActor, characterName);
@@ -4753,7 +4792,8 @@
             personaje: characterName,
             actor_de_doblaje: 'Sin actor',
             url_youtube: '',
-            rareza: 'Común',
+            rol: DEFAULT_ROLE,
+            categoriaRol: DEFAULT_ROLE_CATEGORY,
             thumbnail: createPlaceholderCover(canonicalUniverse)
           });
         }
@@ -4763,11 +4803,6 @@
         renderCharacterProfile(characterId);
         setCharacterProfileFeedback(existingUniverse ? 'Universo existente vinculado correctamente.' : 'Universo creado y vinculado correctamente.');
       });
-    }
-
-    function rarezasPermitidas(value) {
-      const allowed = ['Común', 'Raro', 'Épico', 'Legendario'];
-      return allowed.includes(value) ? value : 'Común';
     }
 
     function renderAchievementsView() {
@@ -4914,8 +4949,8 @@
     }) {
       const previousNormalized = normalizeName(currentCharacterName || '');
       const canonicalName = String(nextCharacterName || '').trim();
-      const canonicalRole = String(nextRole || '').trim() || DEFAULT_ROLE;
-      const canonicalRoleCategory = String(nextRoleCategory || '').trim() || DEFAULT_ROLE_CATEGORY;
+      const canonicalRole = normalizeRole(nextRole);
+      const canonicalRoleCategory = normalizeRoleCategory(nextRoleCategory);
       const canonicalUniverses = normalizeUniverseList(nextUniverses, { fallbackToUnassigned: true });
 
       VIDEOS.forEach((video) => {
@@ -4996,13 +5031,14 @@
           const universes = getCharacterUniverseList(item.name, { fallbackToUnassigned: false });
           const unlockedVersion = item.versions.find(video => hasGreetingVideo(video));
           const sourceVersion = unlockedVersion || item.versions[0] || null;
-          const rarity = rarezasPermitidas(sourceVersion?.rareza || 'Común');
+          const role = normalizeRole(sourceVersion?.rol || sourceVersion?.role);
+          const roleCategory = normalizeRoleCategory(sourceVersion?.categoriaRol || sourceVersion?.roleCategory);
           return {
             ...item,
             actorCount: unlockedByActor.size + blockedActors.length,
             actors: [...new Set([...unlockedByActor.keys(), ...blockedActors])],
             universes,
-            rareza: rarity,
+            rareza: roleLabel(role, roleCategory),
             unlocked: Boolean(unlockedVersion || item.coverVideo)
           };
         })
@@ -5410,8 +5446,6 @@
     function submitNewCharacterForm(formEl) {
       const formData = new FormData(formEl);
       const characterName = String(formData.get('characterName') || '').trim();
-      const role = String(formData.get('characterRole') || DEFAULT_ROLE);
-      const roleCategory = String(formData.get('characterRoleCategory') || DEFAULT_ROLE_CATEGORY);
       const actorsInput = [...new Set(
         formData.getAll('characterActors')
           .map((value) => String(value || '').trim())
@@ -5450,8 +5484,8 @@
           personaje: characterName,
           actor_de_doblaje: 'Sin actor',
           url_youtube: '',
-          rol: role,
-          categoriaRol: roleCategory,
+          rol: DEFAULT_ROLE,
+          categoriaRol: DEFAULT_ROLE_CATEGORY,
           thumbnail: createPlaceholderCover(characterName)
         });
       } else {
@@ -5464,8 +5498,8 @@
             personaje: characterName,
             actor_de_doblaje: actorName,
             url_youtube: '',
-            rol: role,
-            categoriaRol: roleCategory,
+            rol: DEFAULT_ROLE,
+            categoriaRol: DEFAULT_ROLE_CATEGORY,
             thumbnail: createPlaceholderCover(characterName)
           });
           blockCharacterForActor(actorName, characterName);
@@ -5824,8 +5858,6 @@
           event.preventDefault();
           const formData = new FormData(event.currentTarget);
           const newName = String(formData.get('characterName') || '').trim();
-          const newRole = String(formData.get('characterRole') || '').trim();
-          const newRoleCategory = String(formData.get('characterRoleCategory') || '').trim();
           const selectedActors = formData.getAll('characterActors').map((value) => String(value || '').trim()).filter(Boolean);
           const selectedUniverses = formData.getAll('characterUniverses').map((value) => String(value || '').trim()).filter(Boolean);
           const lockedAvatarUrl = String(formData.get('lockedAvatarUrl') || '').trim();
@@ -5840,8 +5872,8 @@
             canonicalUniverses: newUniversesList
           } = updateCharacterMetadata(focusedCharacter, {
             nextCharacterName: newName,
-            nextRole: newRole,
-            nextRoleCategory: newRoleCategory,
+            nextRole: DEFAULT_ROLE,
+            nextRoleCategory: DEFAULT_ROLE_CATEGORY,
             nextUniverses: parsedUniverses
           });
 
@@ -5987,8 +6019,8 @@
               personaje: focusedCharacter,
               actor_de_doblaje: actorName,
               url_youtube: normalizedUrl,
-              rol: rol,
-              categoriaRol: categoriaRol,
+              rol: DEFAULT_ROLE,
+              categoriaRol: DEFAULT_ROLE_CATEGORY,
               thumbnail: metadata.thumbnail || ''
             });
             unlockBlockedCharacterForActor(actorName, focusedCharacter);
@@ -6519,7 +6551,8 @@
 
         const existingCharacterEntries = VIDEOS.filter((video) => normalizeName(video.personaje || '') === normalizedCharacterName);
         const inheritedUniverses = [...new Set(existingCharacterEntries.flatMap(item => getVideoUniverses(item)).filter(Boolean))];
-        const inheritedRarity = rarezasPermitidas(existingCharacterEntries.find(item => item.rareza)?.rareza || 'Común');
+        const inheritedRole = normalizeRole(existingCharacterEntries.find(item => item.rol)?.rol);
+        const inheritedRoleCategory = normalizeRoleCategory(existingCharacterEntries.find(item => item.categoriaRol)?.categoriaRol);
         VIDEOS.push({
           id: `video-bloqueado-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
           titulo: `Registro bloqueado de ${canonicalCharacterName}`,
@@ -6527,7 +6560,8 @@
           personaje: canonicalCharacterName,
           actor_de_doblaje: cleanActorName,
           url_youtube: '',
-          rareza: inheritedRarity,
+          rol: inheritedRole,
+          categoriaRol: inheritedRoleCategory,
           thumbnail: createPlaceholderCover(canonicalCharacterName)
         });
       };
@@ -6633,12 +6667,11 @@
         ...blockedOnly.map((characterName) => {
           const normalizedCharacter = normalizeName(characterName);
           const matchingEntries = VIDEOS.filter((video) => normalizeName(video.personaje || 'Sin personaje') === normalizedCharacter);
-          const rarityRankBest = matchingEntries.reduce((bestRank, video) => {
-            const videoRank = rarityRank(rarezasPermitidas(video.rareza || 'Común'));
-            return videoRank > bestRank ? videoRank : bestRank;
-          }, -1);
-          const rarityLabels = ['Común', 'Raro', 'Épico', 'Legendario'];
-          const rarity = rarityRankBest >= 0 ? rarezasPermitidas(rarityLabels[rarityRankBest]) : 'Común';
+          const representative = matchingEntries[0] || {};
+          const rarity = roleLabel(
+            normalizeRole(representative.rol || representative.role),
+            normalizeRoleCategory(representative.categoriaRol || representative.roleCategory)
+          );
           return {
             characterName,
             unlocked: false,

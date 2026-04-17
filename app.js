@@ -19,7 +19,7 @@
     const state = {
       view: 'map',
       universe: null,
-      filters: { personaje: 'todos', actor: 'todos', rareza: 'todos' },
+      filters: { personaje: 'todos', actor: 'todos', rol: 'todos', categoriaRol: 'todos' },
       search: { personaje: '', actor: '' },
       selectedVideoId: null,
       actorFocus: null,
@@ -100,6 +100,10 @@
     const UNIVERSES_UPDATED_AT_KEY = 'universes_updated_at_v1';
     const CLOUD_STORAGE_PATH = 'univoicerData/main';
     const SPECIAL_UNASSIGNED_UNIVERSE = 'Sin universo';
+    const ROLE_OPTIONS = ['Protagonista', 'Secundario', 'Recurrente', 'Villano'];
+    const ROLE_CATEGORY_OPTIONS = ['A', 'B'];
+    const DEFAULT_ROLE = 'Secundario';
+    const DEFAULT_ROLE_CATEGORY = 'A';
     const MAX_LOCAL_IMAGE_BYTES = 2 * 1024 * 1024;
     const NODE_HALF_WIDTH = 91;
     const NODE_HALF_HEIGHT = 103;
@@ -2341,12 +2345,21 @@
       return '🪐';
     }
 
+    function getVideoRole(video) {
+      return String(video?.rol || '').trim() || DEFAULT_ROLE;
+    }
+
+    function getVideoRoleCategory(video) {
+      return String(video?.categoriaRol || '').trim() || DEFAULT_ROLE_CATEGORY;
+    }
+
     function getFilteredUniverseVideos() {
       return getUniverseVideos().filter(v => {
         const m1 = state.filters.personaje === 'todos' || (v.personaje || 'Sin personaje') === state.filters.personaje;
         const m2 = state.filters.actor === 'todos' || (v.actor_de_doblaje || 'Sin actor') === state.filters.actor;
-        const m3 = state.filters.rareza === 'todos' || (v.rareza || 'Común') === state.filters.rareza;
-        return m1 && m2 && m3;
+        const m3 = state.filters.rol === 'todos' || getVideoRole(v) === state.filters.rol;
+        const m4 = state.filters.categoriaRol === 'todos' || getVideoRoleCategory(v) === state.filters.categoriaRol;
+        return m1 && m2 && m3 && m4;
       });
     }
 
@@ -3666,7 +3679,8 @@
       const universeMap = groupByUniverse();
       const selectedUniverseKey = normalizeUniverseName(state.universe || '');
       const universeData = universeMap[selectedUniverseKey] || { totalCharacters: 0, unlockedCharacters: 0, completion: 0, state: 'incomplete' };
-      const rarezas = ['Común', 'Raro', 'Épico', 'Legendario'];
+      const roles = [...ROLE_OPTIONS];
+      const categoriasRol = [...ROLE_CATEGORY_OPTIONS];
       const universeCharacters = [...new Set(videos.map(v => String(v.personaje || '').trim()).filter(Boolean))]
         .sort((a, b) => a.localeCompare(b, 'es', { sensitivity: 'base' }));
       const defaultCharacterForVideo = universeCharacters[0] || '';
@@ -3864,9 +3878,14 @@
             <label>Nombre del Personaje (Requerido)
               <input type="text" name="personaje" required placeholder="Ej. Gokú">
             </label>
-            <label>Rareza
-              <select name="rareza">
-                ${rarezas.map(r => `<option value="${r}">${r}</option>`).join('')}
+            <label>Rol
+              <select name="rol">
+                ${roles.map((rol) => `<option value="${rol}">${rol}</option>`).join('')}
+              </select>
+            </label>
+            <label>Categoría
+              <select name="categoriaRol">
+                ${categoriasRol.map((categoria) => `<option value="${categoria}">${categoria}</option>`).join('')}
               </select>
             </label>
             <label>Actores de doblaje (Opcional)
@@ -3915,10 +3934,16 @@
           <label>Buscar actor
             <input id="searchActor" type="search" value="${state.search.actor}" placeholder="Ej. Mario Castañeda">
           </label>
-          <label>Rareza
-            <select id="filterRarity">
+          <label>Rol
+            <select id="filterRole">
               <option value="todos">Todas</option>
-              ${rarezas.map(r => `<option value="${r}" ${state.filters.rareza === r ? 'selected' : ''}>${r}</option>`).join('')}
+              ${roles.map((rol) => `<option value="${rol}" ${state.filters.rol === rol ? 'selected' : ''}>${rol}</option>`).join('')}
+            </select>
+          </label>
+          <label>Categoría
+            <select id="filterRoleCategory">
+              <option value="todos">Todas</option>
+              ${categoriasRol.map((categoria) => `<option value="${categoria}" ${state.filters.categoriaRol === categoria ? 'selected' : ''}>${categoria}</option>`).join('')}
             </select>
           </label>
           <button id="clearFilters" class="neon-btn neon-action">Limpiar filtros</button>
@@ -4163,7 +4188,8 @@
             return;
           }
 
-          const rarezaValue = String(formData.get('rareza') || 'Común');
+          const rolValue = String(formData.get('rol') || DEFAULT_ROLE);
+          const categoriaRolValue = String(formData.get('categoriaRol') || DEFAULT_ROLE_CATEGORY);
           const rawUrl = String(formData.get('url_youtube') || '').trim();
           const normalizedUrl = rawUrl ? normalizeYoutubeUrl(rawUrl) : '';
           if (rawUrl && !normalizedUrl) {
@@ -4200,7 +4226,8 @@
               personaje: characterName,
               actor_de_doblaje: actorItem,
               url_youtube: unlocked ? normalizedUrl : '',
-              rareza: rarezaValue,
+              rol: rolValue,
+              categoriaRol: categoriaRolValue,
               thumbnail: unlocked
                 ? (metadata?.thumbnail || createPlaceholderCover(characterName))
                 : createPlaceholderCover(state.universe)
@@ -4246,6 +4273,9 @@
         }
         if (feedback) feedback.textContent = 'Guardando...';
         const metadata = await fetchYoutubeMetadata(normalizedUrl);
+        const selectedCharacterVideos = VIDEOS.filter((item) =>
+          normalizeName(item.personaje || '') === normalizeName(selectedCharacterOption.name || '')
+        );
         const newVideo = {
           id: `video-${Date.now()}`,
           universo: [state.universe],
@@ -4254,7 +4284,8 @@
           url_youtube: normalizedUrl,
           thumbnail: metadata.thumbnail,
           titulo: metadata.title,
-          rareza: String(formData.get('rareza') || 'Común')
+          rol: getVideoRole(selectedCharacterVideos[0]),
+          categoriaRol: getVideoRoleCategory(selectedCharacterVideos[0])
         };
         VIDEOS.push(newVideo);
         unlockBlockedCharacterForActor(newVideo.actor_de_doblaje, newVideo.personaje);
@@ -4266,7 +4297,7 @@
       });
 
       document.getElementById('clearFilters').onclick = () => {
-        state.filters = { personaje: 'todos', actor: 'todos', rareza: 'todos' };
+        state.filters = { personaje: 'todos', actor: 'todos', rol: 'todos', categoriaRol: 'todos' };
         state.search = { personaje: '', actor: '' };
         renderUniverseView();
       };
@@ -4288,7 +4319,8 @@
 
       document.getElementById('searchCharacter').oninput = (e) => { state.search.personaje = e.target.value; renderUniverseView(); };
       document.getElementById('searchActor').oninput = (e) => { state.search.actor = e.target.value; renderUniverseView(); };
-      document.getElementById('filterRarity').onchange = (e) => { state.filters.rareza = e.target.value; renderUniverseView(); };
+      document.getElementById('filterRole').onchange = (e) => { state.filters.rol = e.target.value; renderUniverseView(); };
+      document.getElementById('filterRoleCategory').onchange = (e) => { state.filters.categoriaRol = e.target.value; renderUniverseView(); };
 
       viewUniverse.querySelectorAll('[data-open-character]').forEach((btn) => {
         btn.addEventListener('click', (event) => {
@@ -4429,19 +4461,12 @@
       if (!normalizedCharacter) return;
 
       const characterVideos = VIDEOS.filter((item) => normalizeName(item.personaje || '') === normalizedCharacter);
-      const currentRarity = characterVideos[0]?.rareza || 'Común';
+      const currentRole = getVideoRole(characterVideos[0]);
+      const currentRoleCategory = getVideoRoleCategory(characterVideos[0]);
       const currentUniverses = getCharacterUniverseList(focusedCharacter, { fallbackToUnassigned: false });
       const currentActors = [...new Set(characterVideos.map((item) => String(item.actor_de_doblaje || 'Sin actor').trim()).filter(Boolean))];
-      const rarityOptions = [...new Set([
-        ...VIDEOS
-          .map((item) => String(item.rareza || '').trim())
-          .filter(Boolean),
-        String(currentRarity || 'Común').trim() || 'Común'
-      ])].sort((a, b) => {
-        const rankDiff = rarityRank(b) - rarityRank(a);
-        if (rankDiff !== 0) return rankDiff;
-        return a.localeCompare(b, 'es', { sensitivity: 'base' });
-      });
+      const roleOptions = [...ROLE_OPTIONS];
+      const roleCategoryOptions = [...ROLE_CATEGORY_OPTIONS];
       const actorOptions = getActorOptionsForIndiceFilters();
       const universeOptions = getUniverseOptionsForIndiceFilters();
       const currentActorsNormalized = new Set(currentActors.map((actorName) => normalizeName(actorName)));
@@ -4459,9 +4484,14 @@
                 <label>Nombre del personaje
                   <input type="text" name="characterName" value="${escapeHtml(focusedCharacter)}" required>
                 </label>
-                <label>Rareza
-                  <select name="characterRarity">
-                    ${rarityOptions.map((option) => `<option value="${escapeHtml(option)}" ${option === currentRarity ? 'selected' : ''}>${escapeHtml(option)}</option>`).join('')}
+                <label>Rol
+                  <select name="characterRole">
+                    ${roleOptions.map((option) => `<option value="${escapeHtml(option)}" ${option === currentRole ? 'selected' : ''}>${escapeHtml(option)}</option>`).join('')}
+                  </select>
+                </label>
+                <label>Categoría
+                  <select name="characterRoleCategory">
+                    ${roleCategoryOptions.map((option) => `<option value="${escapeHtml(option)}" ${option === currentRoleCategory ? 'selected' : ''}>${escapeHtml(option)}</option>`).join('')}
                   </select>
                 </label>
                 <label>Actores
@@ -4506,7 +4536,8 @@
         event.preventDefault();
         const formData = new FormData(event.currentTarget);
         const nextCharacterName = String(formData.get('characterName') || '').trim();
-        const nextRarity = String(formData.get('characterRarity') || '').trim() || 'Común';
+        const nextRole = String(formData.get('characterRole') || '').trim() || DEFAULT_ROLE;
+        const nextRoleCategory = String(formData.get('characterRoleCategory') || '').trim() || DEFAULT_ROLE_CATEGORY;
         const nextActors = [...new Set(
           formData.getAll('characterActors').map((item) => String(item || '').trim()).filter(Boolean)
         )];
@@ -4515,9 +4546,10 @@
         )];
         if (!nextCharacterName) return;
 
-        const { canonicalName, canonicalRarity, canonicalUniverses } = updateCharacterMetadata(focusedCharacter, {
+        const { canonicalName, canonicalRole, canonicalRoleCategory, canonicalUniverses } = updateCharacterMetadata(focusedCharacter, {
           nextCharacterName,
-          nextRarity,
+          nextRole,
+          nextRoleCategory,
           nextUniverses
         });
 
@@ -4552,7 +4584,8 @@
             personaje: canonicalName,
             actor_de_doblaje: actorName,
             url_youtube: '',
-            rareza: canonicalRarity,
+            rol: canonicalRole,
+            categoriaRol: canonicalRoleCategory,
             thumbnail: createPlaceholderCover(canonicalName)
           });
           blockCharacterForActor(actorName, canonicalName);
@@ -4875,18 +4908,21 @@
 
     function updateCharacterMetadata(currentCharacterName, {
       nextCharacterName,
-      nextRarity,
+      nextRole,
+      nextRoleCategory,
       nextUniverses
     }) {
       const previousNormalized = normalizeName(currentCharacterName || '');
       const canonicalName = String(nextCharacterName || '').trim();
-      const canonicalRarity = String(nextRarity || '').trim() || 'Común';
+      const canonicalRole = String(nextRole || '').trim() || DEFAULT_ROLE;
+      const canonicalRoleCategory = String(nextRoleCategory || '').trim() || DEFAULT_ROLE_CATEGORY;
       const canonicalUniverses = normalizeUniverseList(nextUniverses, { fallbackToUnassigned: true });
 
       VIDEOS.forEach((video) => {
         if (normalizeName(video.personaje || '') !== previousNormalized) return;
         video.personaje = canonicalName;
-        video.rareza = canonicalRarity;
+        video.rol = canonicalRole;
+        video.categoriaRol = canonicalRoleCategory;
         video.universo = [...canonicalUniverses];
       });
 
@@ -4897,7 +4933,7 @@
         );
       });
 
-      return { canonicalName, canonicalRarity, canonicalUniverses };
+      return { canonicalName, canonicalRole, canonicalRoleCategory, canonicalUniverses };
     }
 
     function getCharactersForIndice(searchTerm = '') {
@@ -5374,7 +5410,8 @@
     function submitNewCharacterForm(formEl) {
       const formData = new FormData(formEl);
       const characterName = String(formData.get('characterName') || '').trim();
-      const rarity = String(formData.get('characterRarity') || 'Común');
+      const role = String(formData.get('characterRole') || DEFAULT_ROLE);
+      const roleCategory = String(formData.get('characterRoleCategory') || DEFAULT_ROLE_CATEGORY);
       const actorsInput = [...new Set(
         formData.getAll('characterActors')
           .map((value) => String(value || '').trim())
@@ -5413,7 +5450,8 @@
           personaje: characterName,
           actor_de_doblaje: 'Sin actor',
           url_youtube: '',
-          rareza: rarity,
+          rol: role,
+          categoriaRol: roleCategory,
           thumbnail: createPlaceholderCover(characterName)
         });
       } else {
@@ -5426,7 +5464,8 @@
             personaje: characterName,
             actor_de_doblaje: actorName,
             url_youtube: '',
-            rareza: rarity,
+            rol: role,
+            categoriaRol: roleCategory,
             thumbnail: createPlaceholderCover(characterName)
           });
           blockCharacterForActor(actorName, characterName);
@@ -5610,7 +5649,8 @@
         // Datos del personaje
         const normalizedCharacter = normalizeName(focusedCharacter);
         const charVideos = VIDEOS.filter(v => normalizeName(v.personaje || '') === normalizedCharacter);
-        const rareza = charVideos[0]?.rareza || 'Común';
+        const rol = getVideoRole(charVideos[0]);
+        const categoriaRol = getVideoRoleCategory(charVideos[0]);
         const universos = getCharacterUniverseList(focusedCharacter, { fallbackToUnassigned: false });
         const realVideos = charVideos.filter(v => hasGreetingVideo(v));
         
@@ -5621,14 +5661,8 @@
         const actorCards = [...unlockedActors, ...lockedActors]
           .map(item => ({ ...item, isUnlocked: !item.locked && hasGreetingVideo(item.video) }))
           .sort((a, b) => a.actorName.localeCompare(b.actorName, 'es', { sensitivity: 'base' }));
-        const rarityOptions = [...new Set([
-          ...VIDEOS.map((video) => String(video.rareza || '').trim()).filter(Boolean),
-          String(rareza || 'Común').trim() || 'Común'
-        ])].sort((a, b) => {
-          const rankDiff = rarityRank(b) - rarityRank(a);
-          if (rankDiff !== 0) return rankDiff;
-          return a.localeCompare(b, 'es', { sensitivity: 'base' });
-        });
+        const roleOptions = [...ROLE_OPTIONS];
+        const roleCategoryOptions = [...ROLE_CATEGORY_OPTIONS];
         const actorOptions = getActorOptionsForIndiceFilters();
         const universeOptions = [...new Set([
           ...getUniverseOptionsForIndiceFilters(),
@@ -5670,7 +5704,8 @@
               <div class="character-hero__content">
                 <h2 class="section-title detail-character character-hero__title">${focusedCharacter}</h2>
                 <div class="detail-meta character-hero__badges">
-                  <span class="badge character-hero__badge ${rarityClass(rareza)}">🌟 ${rareza}</span>
+                  <span class="badge character-hero__badge">🎭 ${rol}</span>
+                  <span class="badge character-hero__badge">🏷️ ${categoriaRol}</span>
                   ${universos.map((universe) => {
                     const universeLabel = String(universe || '').trim() || SPECIAL_UNASSIGNED_UNIVERSE;
                     return `<button type="button" class="badge character-hero__badge character-hero__badge--universes character-hero__badge--universe-red character-hero__badge--universe-link" data-open-universe-profile="${escapeHtml(universeLabel)}" aria-label="Abrir perfil del universo ${escapeHtml(universeLabel)}"><span class="character-hero__universe-name">${escapeHtml(universeLabel)}</span></button>`;
@@ -5689,9 +5724,14 @@
                 <label>Nombre del personaje
                   <input type="text" name="characterName" value="${focusedCharacter}">
                 </label>
-                <label>Rareza
-                  <select name="characterRarity">
-                    ${rarityOptions.map((option) => `<option value="${escapeHtml(option)}" ${option === rareza ? 'selected' : ''}>${escapeHtml(option)}</option>`).join('')}
+                <label>Rol
+                  <select name="characterRole">
+                    ${roleOptions.map((option) => `<option value="${escapeHtml(option)}" ${option === rol ? 'selected' : ''}>${escapeHtml(option)}</option>`).join('')}
+                  </select>
+                </label>
+                <label>Categoría
+                  <select name="characterRoleCategory">
+                    ${roleCategoryOptions.map((option) => `<option value="${escapeHtml(option)}" ${option === categoriaRol ? 'selected' : ''}>${escapeHtml(option)}</option>`).join('')}
                   </select>
                 </label>
                 <label>Actores
@@ -5784,7 +5824,8 @@
           event.preventDefault();
           const formData = new FormData(event.currentTarget);
           const newName = String(formData.get('characterName') || '').trim();
-          const newRarity = String(formData.get('characterRarity') || '').trim();
+          const newRole = String(formData.get('characterRole') || '').trim();
+          const newRoleCategory = String(formData.get('characterRoleCategory') || '').trim();
           const selectedActors = formData.getAll('characterActors').map((value) => String(value || '').trim()).filter(Boolean);
           const selectedUniverses = formData.getAll('characterUniverses').map((value) => String(value || '').trim()).filter(Boolean);
           const lockedAvatarUrl = String(formData.get('lockedAvatarUrl') || '').trim();
@@ -5794,11 +5835,13 @@
           const parsedUniverses = [...new Set(selectedUniverses)];
           const {
             canonicalName: cleanName,
-            canonicalRarity: cleanRarity,
+            canonicalRole: cleanRole,
+            canonicalRoleCategory: cleanRoleCategory,
             canonicalUniverses: newUniversesList
           } = updateCharacterMetadata(focusedCharacter, {
             nextCharacterName: newName,
-            nextRarity: newRarity,
+            nextRole: newRole,
+            nextRoleCategory: newRoleCategory,
             nextUniverses: parsedUniverses
           });
 
@@ -5837,7 +5880,8 @@
                   personaje: cleanName,
                   actor_de_doblaje: actor,
                   url_youtube: '',
-                  rareza: cleanRarity,
+                  rol: cleanRole,
+                  categoriaRol: cleanRoleCategory,
                   thumbnail: createPlaceholderCover(cleanName),
                   locked_avatar_url: lockedAvatarUrl
               });
@@ -5908,7 +5952,7 @@
             const universeName = String(btn.dataset.openUniverseProfile || '').trim();
             if (!universeName) return;
             state.universe = universeName;
-            state.filters = { personaje: 'todos', actor: 'todos', rareza: 'todos' };
+            state.filters = { personaje: 'todos', actor: 'todos', rol: 'todos', categoriaRol: 'todos' };
             changeView('universe');
           });
         });
@@ -5943,7 +5987,8 @@
               personaje: focusedCharacter,
               actor_de_doblaje: actorName,
               url_youtube: normalizedUrl,
-              rareza: rareza, // Mantiene la rareza configurada
+              rol: rol,
+              categoriaRol: categoriaRol,
               thumbnail: metadata.thumbnail || ''
             });
             unlockBlockedCharacterForActor(actorName, focusedCharacter);
@@ -5995,12 +6040,14 @@
               <label>Nombre del personaje
                 <input type="text" name="characterName" placeholder="Ej. Homero Simpson" required>
               </label>
-              <label>Rareza
-                <select name="characterRarity">
-                  <option value="Común">Común</option>
-                  <option value="Raro">Raro</option>
-                  <option value="Épico">Épico</option>
-                  <option value="Legendario">Legendario</option>
+              <label>Rol
+                <select name="characterRole">
+                  ${ROLE_OPTIONS.map((option) => `<option value="${option}">${option}</option>`).join('')}
+                </select>
+              </label>
+              <label>Categoría
+                <select name="characterRoleCategory">
+                  ${ROLE_CATEGORY_OPTIONS.map((option) => `<option value="${option}">${option}</option>`).join('')}
                 </select>
               </label>
               <label>Actores de doblaje (opcional)

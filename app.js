@@ -2917,7 +2917,7 @@
 
     function isUniverseExpandedOnMap(universeNode) {
       if (!universeNode?.id) return false;
-      return state.expandedUniverses.has(universeNode.id) || hasFavoriteDirectChildWorld(universeNode.id);
+      return state.expandedUniverses.has(universeNode.id);
     }
 
     function getConnectorVariant(seedKey) {

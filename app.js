@@ -23,17 +23,6 @@
       search: { personaje: '', actor: '' },
       selectedVideoId: null,
       actorFocus: null,
-      actorLetterFilter: '',
-      actorLetterFilterExpanded: false,
-      actorTierFiltersExpanded: false,
-      actorTierFilters: {
-        platinado: false,
-        consagrado: false,
-        destacado: false,
-        desbloqueado: false,
-        bloqueado: false
-      },
-      actorDetailsExpanded: false,
       actorRenameModalOpen: false,
       showAddForm: false,
       universeAddMode: 'video',
@@ -4672,9 +4661,6 @@
         if (!actorName) return;
         modal.remove();
         state.actorFocus = actorName;
-        state.actorLetterFilter = getActorInitialLetter(actorName);
-        state.actorLetterFilterExpanded = true;
-        state.actorDetailsExpanded = true;
         changeView('actores');
       });
       modal.querySelector('#editVideo')?.addEventListener('click', () => {
@@ -6248,9 +6234,6 @@
             const actorName = btn.dataset.openActorProfile;
             if (!actorName) return;
             state.actorFocus = actorName;
-            state.actorLetterFilter = getActorInitialLetter(actorName);
-            state.actorLetterFilterExpanded = true;
-            state.actorDetailsExpanded = true;
             changeView('actores');
           });
         });
@@ -6818,17 +6801,6 @@
     }
 
     function renderActoresView() {
-      const getActorTierFlags = (entries, unlockedVideosCount) => {
-        const totalEntries = entries.length;
-        const completion = totalEntries ? Math.round((unlockedVideosCount / totalEntries) * 100) : 0;
-        return {
-          platinado: totalEntries > 0 && completion === 100,
-          consagrado: completion >= 70,
-          destacado: completion >= 40,
-          desbloqueado: unlockedVideosCount > 0
-        };
-      };
-
       const ensureBlockedPlaceholderForActorCharacter = (actorName, characterName) => {
         const cleanActorName = String(actorName || '').trim();
         const cleanCharacterName = String(characterName || '').trim();
@@ -6866,241 +6838,154 @@
         if (!cleanName) return;
         const normalizedName = normalizeName(cleanName);
         if (!normalizedName || normalizedName === normalizeName('Sin actor')) return;
-        if (!actorNameByNormalized.has(normalizedName)) {
-          actorNameByNormalized.set(normalizedName, cleanName);
-        }
+        if (!actorNameByNormalized.has(normalizedName)) actorNameByNormalized.set(normalizedName, cleanName);
       };
       collectionModel.actors.forEach((item) => registerActorName(item?.name));
       VIDEOS.forEach((video) => registerActorName(video?.actor_de_doblaje));
       const actors = [...actorNameByNormalized.values()].sort((a, b) => a.localeCompare(b, 'es', { sensitivity: 'base' }));
-      const actorSummaries = actors.map((name) => {
-        const entries = VIDEOS.filter(v => (v.actor_de_doblaje || 'Sin actor') === name);
-        const blockedCharacters = state.blockedCharactersByActor[name] || [];
-        const unlockedCharactersSet = new Set(
-          entries
-            .filter(v => hasGreetingVideo(v))
-            .map(v => String(v.personaje || 'Sin personaje').trim())
-            .filter(Boolean)
-        );
-        const totalCharactersSet = new Set([
-          ...entries.map(v => String(v.personaje || 'Sin personaje').trim()).filter(Boolean),
-          ...blockedCharacters.map((characterName) => String(characterName || '').trim()).filter(Boolean)
-        ]);
-        const unlockedCharactersCount = unlockedCharactersSet.size;
-        const totalCharactersCount = totalCharactersSet.size;
-        const tier = getActorTier(unlockedCharactersCount);
-        const completionRatio = totalCharactersCount > 0 ? (unlockedCharactersCount / totalCharactersCount) : 0;
-        const completionPercent = Math.round(completionRatio * 100);
-        return {
-          name,
-          entries,
-          videosCount: entries.filter(v => hasGreetingVideo(v)).length,
-          charactersCount: totalCharactersCount,
-          unlockedCharactersCount,
-          totalCharactersCount,
-          tier,
-          tierLabel: tier.label,
-          tierRank: tier.rank,
-          initial: getActorInitialLetter(name),
-          completionPercent,
-          completionLabel: `${unlockedCharactersCount}/${totalCharactersCount || 0}`,
-          tierFlags: {
-            platinado: tier.key === 'platinado',
-            consagrado: tier.key === 'consagrado',
-            destacado: tier.key === 'destacado',
-            desbloqueado: tier.key === 'desbloqueado',
-            bloqueado: tier.key === 'bloqueado'
-          }
-        };
-      }).sort((a, b) => (
-        b.tierRank - a.tierRank
-        || b.unlockedCharactersCount - a.unlockedCharactersCount
-        || b.charactersCount - a.charactersCount
-        || b.videosCount - a.videosCount
-        || a.name.localeCompare(b.name, 'es', { sensitivity: 'base' })
-      ));
 
-      const activeTierFilterKeys = Object.entries(state.actorTierFilters || {})
-        .filter(([, isActive]) => Boolean(isActive))
-        .map(([key]) => key);
-      const actorSummariesByTier = activeTierFilterKeys.length
-        ? actorSummaries.filter((summary) => activeTierFilterKeys.some((tierKey) => summary.tierFlags?.[tierKey]))
-        : actorSummaries;
-
-      const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
-      const activeLetterFilter = state.actorLetterFilter || '';
-      const filteredActorSummaries = actorSummariesByTier.filter((item) => (
-        !activeLetterFilter || item.initial === activeLetterFilter
-      ));
-      const visibleActorNames = filteredActorSummaries.map((item) => item.name);
-      if (state.actorFocus && !visibleActorNames.includes(state.actorFocus)) {
+      if (state.actorFocus && !actors.some((name) => normalizeName(name) === normalizeName(state.actorFocus))) {
         state.actorFocus = null;
-        state.actorDetailsExpanded = false;
-      }
-      const actor = state.actorFocus || null;
-      if (!actor || !state.actorDetailsExpanded) {
         state.actorRenameModalOpen = false;
       }
-      const actorEntries = VIDEOS.filter((video) => (video.actor_de_doblaje || 'Sin actor') === actor);
-      const actorVideos = actorEntries.filter((video) => hasGreetingVideo(video));
-      const blockedCharacters = Array.isArray(state.blockedCharactersByActor?.[actor])
-        ? state.blockedCharactersByActor[actor]
-        : [];
-      const normalizedActorCards = new Map();
-      let actorCardOrder = 0;
 
-      const upsertActorCharacterCard = (rawCharacterName, { unlocked = false } = {}) => {
-        const cleanName = String(rawCharacterName || '').trim() || 'Sin personaje';
-        const normalizedName = normalizeName(cleanName);
-        if (!normalizedName) return;
-        const existing = normalizedActorCards.get(normalizedName);
-        if (existing) {
-          existing.unlocked = existing.unlocked || unlocked;
-          if (!existing.coverVideo && unlocked) {
-            existing.coverVideo = actorVideos.find((item) => normalizeName(item.personaje || 'Sin personaje') === normalizedName) || null;
-          }
-          return;
-        }
-        const coverVideo = unlocked
-          ? actorVideos.find((item) => normalizeName(item.personaje || 'Sin personaje') === normalizedName) || null
-          : null;
-        normalizedActorCards.set(normalizedName, {
-          name: cleanName,
-          coverVideo,
-          unlocked,
-          order: actorCardOrder
+      const actor = state.actorFocus ? actors.find((name) => normalizeName(name) === normalizeName(state.actorFocus)) || state.actorFocus : null;
+
+      if (!actor) {
+        viewActores.innerHTML = `
+          <section class="mock-shell holo-card actors-shell">
+            <div class="mock-topbar">
+              <h2 class="actor-panel-title no-margin toon-title">Colección de actores</h2>
+              <button id="toggleActorFormBtn" class="neon-btn actor-action-btn">Agregar Nuevo Actor</button>
+            </div>
+
+            <form id="addActorForm" class="add-character-form mock-form-hidden">
+              <label>Nombre del Actor
+                <input type="text" name="actorName" required placeholder="Ej. Mario Castañeda">
+              </label>
+              <label>Personajes (opcional, separados por coma)
+                <input type="text" name="actorCharacters" placeholder="Ej. Goku, Kanon de Géminis">
+              </label>
+              <div class="actions">
+                <button type="submit" class="neon-btn neon-btn--primary">Guardar Actor</button>
+              </div>
+            </form>
+
+            <div class="actor-gallery mock-gap-lg">
+              ${actors.map((name) => `
+                <button type="button" class="actor-card" data-actor-card="${escapeHtml(name)}">
+                  <h3 class="actor-card-title">${escapeHtml(name)}</h3>
+                </button>
+              `).join('') || '<p class="muted">No hay actores registrados.</p>'}
+            </div>
+          </section>
+        `;
+
+        const toggleBtn = document.getElementById('toggleActorFormBtn');
+        const actorForm = document.getElementById('addActorForm');
+        toggleBtn?.addEventListener('click', () => {
+          const isHidden = actorForm.classList.toggle('mock-form-hidden');
+          toggleBtn.textContent = isHidden ? 'Agregar Nuevo Actor' : 'Cerrar Formulario';
         });
-        actorCardOrder += 1;
-      };
 
-      actorEntries.forEach((video) => upsertActorCharacterCard(video.personaje || 'Sin personaje', { unlocked: hasGreetingVideo(video) }));
-      blockedCharacters.forEach((characterName) => upsertActorCharacterCard(characterName, { unlocked: false }));
+        actorForm?.addEventListener('submit', (e) => {
+          e.preventDefault();
+          const fd = new FormData(e.target);
+          const actorName = String(fd.get('actorName') || '').trim();
+          const charsRaw = String(fd.get('actorCharacters') || '').trim();
+          const chars = charsRaw ? charsRaw.split(',').map(s=>s.trim()).filter(Boolean) : [];
+          if (!actorName) return;
 
-      const actorCharacterCards = [...normalizedActorCards.values()]
-        .map((item) => {
-          const roleData = highestRoleCategoryForActorCharacter(actor, item.name);
+          const normalizedActorName = normalizeEntityName(actorName);
+          const existingActor = collectionModel.actors.find(a => normalizeEntityName(a.name) === normalizedActorName);
+          if (!existingActor) {
+            collectionModel.actors.push({
+              id: createModelId('actor', normalizedActorName),
+              name: actorName,
+              characterIds: []
+            });
+            saveCollectionModel();
+          }
+
+          chars.forEach((char) => {
+            ensureBlockedPlaceholderForActorCharacter(actorName, char);
+            blockCharacterForActor(actorName, char);
+          });
+
+          saveVideos();
+          refreshDependentViews();
+          state.actorFocus = actorName;
+          renderActoresView();
+        });
+
+        viewActores.querySelectorAll('[data-actor-card]').forEach((btn) => {
+          btn.addEventListener('click', () => {
+            const clickedActor = String(btn.dataset.actorCard || '').trim();
+            if (!clickedActor) return;
+            state.actorFocus = clickedActor;
+            state.actorRenameModalOpen = false;
+            renderActoresView();
+          });
+        });
+        return;
+      }
+
+      const actorEntries = VIDEOS.filter(v => normalizeName(v.actor_de_doblaje || 'Sin actor') === normalizeName(actor));
+      const actorVideos = actorEntries.filter(v => hasGreetingVideo(v));
+      const actorCharacters = [...new Set(actorEntries.map(v => v.personaje || 'Sin personaje'))];
+      const blockedCharacters = state.blockedCharactersByActor[actor] || [];
+      const blockedOnly = blockedCharacters.filter(name => !actorCharacters.includes(name));
+      const actorCharacterCards = [
+        ...actorCharacters.map((characterName) => {
+          const relatedVideo = actorVideos.find(item => (item.personaje || 'Sin personaje') === characterName && hasGreetingVideo(item));
+          const roleData = highestRoleCategoryForActorCharacter(actor, characterName);
           return {
-            name: item.name,
-            coverVideo: item.coverVideo,
-            unlocked: item.unlocked,
+            characterName,
+            unlocked: Boolean(relatedVideo),
+            rarity: roleData.label,
             rol: roleData.rol,
             categoriaRol: roleData.categoriaRol,
-            order: item.order
+            video: relatedVideo || null
           };
-        })
-        .sort((a, b) => {
-          if (a.unlocked !== b.unlocked) return a.unlocked ? -1 : 1;
-          const byName = a.name.localeCompare(b.name, 'es', { sensitivity: 'base' });
-          if (byName !== 0) return byName;
-          return a.order - b.order;
-        });
-      const actorCharacters = actorCharacterCards.map((item) => item.name);
-      const actorInlineDetailMarkup = actor && state.actorDetailsExpanded ? `
-        <article class="mock-box actor-detail-grid mock-gap-md toon-panel actor-inline-detail">
-          <div>
-            <div class="actor-detail-header">
-              <h3 class="actor-detail-title"><span class="actor-detail-name">${escapeHtml(actor)}</span></h3>
-              <div class="actions actor-detail-actions">
-              <button id="editActorBtn" class="neon-btn actor-icon-btn actor-icon-btn--edit" aria-label="Editar actor" title="Editar actor">✏️</button>
-              <button id="deleteActorBtn" class="neon-btn actor-icon-btn actor-icon-btn--danger" aria-label="Eliminar actor" title="Eliminar actor">🗑️</button>
-              </div>
-            </div>
-            <p class="muted">Personajes: ${actorCharacters.length} · Videos: ${actorVideos.length}</p>
-            <div class="actions actor-blocked-actions">
-              <input id="blockedCharacterInput" type="text" placeholder="Agregar personaje bloqueado">
-              <button id="addBlockedCharacter" class="neon-btn">Agregar bloqueado</button>
-            </div>
-            <ul class="actor-character-list">
-              ${actorCharacterCards.map((item) => `
-                <li class="actor-character-item">
-                  ${renderCharacterGalleryCard(item, {
-                    locked: !item.unlocked,
-                    openCharacter: item.unlocked
-                  })}
-                </li>
-              `).join('') || '<li class="actor-character-item"><p class="muted">Sin personajes registrados.</p></li>'}
-            </ul>
-          </div>
-        </article>
-      ` : '';
-
-      const selectedActorIndex = filteredActorSummaries.findIndex((item) => item.name === actor);
-      const actorCardsPerRow = 4;
-      const selectedActorRowEndIndex = selectedActorIndex >= 0
-        ? Math.min((Math.floor(selectedActorIndex / actorCardsPerRow) + 1) * actorCardsPerRow, filteredActorSummaries.length) - 1
-        : -1;
+        }),
+        ...blockedOnly.map((characterName) => ({
+          characterName,
+          unlocked: false,
+          rarity: 'Bloqueado',
+          rol: 'Bloqueado',
+          categoriaRol: '',
+          video: null
+        }))
+      ];
 
       viewActores.innerHTML = `
-        <section class="mock-shell holo-card actors-shell">
+        <section class="mock-shell holo-card actors-shell actor-focus-shell">
           <div class="mock-topbar">
-            <h2 class="actor-panel-title no-margin toon-title">Colección de actores</h2>
-            <button id="toggleActorFormBtn" class="neon-btn actor-action-btn">Agregar Nuevo Actor</button>
+            <button id="backToActorsListBtn" class="neon-btn">← Volver a actores</button>
+            <h2 class="actor-panel-title no-margin toon-title">${escapeHtml(actor)}</h2>
           </div>
-          <div class="actor-toolbar" aria-label="Controles de filtrado de actores">
-            <button type="button" class="actor-filter-toggle ${state.actorLetterFilterExpanded ? 'active' : ''}" id="toggleActorAlphabetBtn" aria-expanded="${state.actorLetterFilterExpanded ? 'true' : 'false'}">A-Z</button>
-            <button type="button" class="actor-filter-toggle actor-filter-toggle--flag ${state.actorTierFiltersExpanded ? 'active' : ''}" id="toggleActorTierFiltersBtn" aria-expanded="${state.actorTierFiltersExpanded ? 'true' : 'false'}">🚩</button>
+          <p class="muted">Personajes: ${actorCharacters.length} · Videos: ${actorVideos.length}</p>
+          <div class="actions actor-blocked-actions">
+            <input id="blockedCharacterInput" type="text" placeholder="Agregar personaje bloqueado">
+            <button id="addBlockedCharacter" class="neon-btn">Agregar bloqueado</button>
+            <button id="editActorBtn" class="neon-btn" aria-label="Editar actor">✏️ Editar</button>
+            <button id="deleteActorBtn" class="neon-btn" aria-label="Eliminar actor">🗑️ Eliminar</button>
           </div>
-          <div class="actor-alpha-filter ${state.actorLetterFilterExpanded ? '' : 'is-hidden'}" aria-label="Filtro alfabético de actores">
-            ${alphabet.map((letter) => `
-              <button type="button" class="actor-alpha-btn ${activeLetterFilter === letter ? 'active' : ''}" data-actor-letter="${letter}">${letter}</button>
-            `).join('')}
-          </div>
-
-          <form id="addActorForm" class="add-character-form mock-form-hidden">
-            <label>Nombre del Actor
-              <input type="text" name="actorName" required placeholder="Ej. Mario Castañeda">
-            </label>
-            <label>Personajes (opcional, separados por coma)
-              <input type="text" name="actorCharacters" placeholder="Ej. Goku, Kanon de Géminis">
-            </label>
-            <div class="actions">
-              <button type="submit" class="neon-btn neon-btn--primary">Guardar Actor</button>
-            </div>
-          </form>
-
-          <div class="actor-tier-filters ${state.actorTierFiltersExpanded ? '' : 'is-hidden'}" aria-label="Filtro por estado actual de actor">
-            <label class="actor-tier-filter-item">
-              <input type="checkbox" data-actor-tier-filter="platinado" ${state.actorTierFilters.platinado ? 'checked' : ''}>
-              <span>Platinado</span>
-            </label>
-            <label class="actor-tier-filter-item">
-              <input type="checkbox" data-actor-tier-filter="consagrado" ${state.actorTierFilters.consagrado ? 'checked' : ''}>
-              <span>Consagrado</span>
-            </label>
-            <label class="actor-tier-filter-item">
-              <input type="checkbox" data-actor-tier-filter="destacado" ${state.actorTierFilters.destacado ? 'checked' : ''}>
-              <span>Destacado</span>
-            </label>
-            <label class="actor-tier-filter-item">
-              <input type="checkbox" data-actor-tier-filter="desbloqueado" ${state.actorTierFilters.desbloqueado ? 'checked' : ''}>
-              <span>Desbloqueado</span>
-            </label>
-            <label class="actor-tier-filter-item">
-              <input type="checkbox" data-actor-tier-filter="bloqueado" ${state.actorTierFilters.bloqueado ? 'checked' : ''}>
-              <span>Bloqueado</span>
-            </label>
-          </div>
-
-          <div class="actor-gallery mock-gap-lg">
-            ${filteredActorSummaries.map((item, idx) => `
-              <button type="button" class="actor-card actor-card--${item.tier.key} actor-card--tier-${item.tier.key} ${item.name === actor ? 'active' : ''}" data-actor-card="${escapeHtml(item.name)}">
-                <h3 class="actor-card-title">${escapeHtml(item.name)}</h3>
-                <p class="actor-card-tier actor-card-tier--${item.tier.key}">${escapeHtml(item.tierLabel)}</p>
-                <div class="actor-card-footer">
-                  <p class="actor-card-meta">Personajes: ${item.totalCharactersCount}</p>
-                  <p class="actor-card-meta">Desbloqueados: ${item.unlockedCharactersCount}</p>
-                </div>
-                <div class="actor-card-progress" role="img" aria-label="Progreso del perfil ${item.completionLabel}">
-                  <div class="actor-card-progress-track">
-                    <div class="actor-card-progress-fill" style="width: ${item.completionPercent}%;"></div>
-                  </div>
-                  <p class="actor-card-progress-label">${escapeHtml(item.completionLabel)}</p>
-                </div>
-              </button>
-              ${selectedActorRowEndIndex === idx ? actorInlineDetailMarkup : ''}
-            `).join('') || '<p class="muted">No hay actores para este filtro.</p>'}
-          </div>
-          ${actor && state.actorDetailsExpanded && state.actorRenameModalOpen ? `
+          <ul class="actor-character-list">
+            ${actorCharacterCards.map((item) => `
+              <li class="actor-character-item">
+                ${renderCharacterGalleryCard({
+                  name: item.characterName,
+                  coverVideo: item.video || null,
+                  rareza: item.rarity,
+                  rol: item.rol,
+                  categoriaRol: item.categoriaRol,
+                  unlocked: item.unlocked
+                }, { locked: !item.unlocked })}
+              </li>
+            `).join('') || '<li class="actor-character-item"><p class="muted">Sin personajes registrados.</p></li>'}
+          </ul>
+          ${state.actorRenameModalOpen ? `
             <section id="actorRenameModal" class="detail-modal actor-rename-modal" role="dialog" aria-modal="true" aria-labelledby="actorRenameTitle">
               <article class="detail-content mock-box actor-rename-panel" data-actor-rename-panel>
                 <h3 id="actorRenameTitle" class="no-margin toon-title">Renombrar actor</h3>
@@ -7119,92 +7004,23 @@
         </section>
       `;
 
-      // Form Toggle
-      const toggleAlphabetBtn = document.getElementById('toggleActorAlphabetBtn');
-      toggleAlphabetBtn?.addEventListener('click', () => {
-        state.actorLetterFilterExpanded = !state.actorLetterFilterExpanded;
-        renderActoresView();
-      });
-      const toggleTierFiltersBtn = document.getElementById('toggleActorTierFiltersBtn');
-      toggleTierFiltersBtn?.addEventListener('click', () => {
-        state.actorTierFiltersExpanded = !state.actorTierFiltersExpanded;
+      document.getElementById('backToActorsListBtn')?.addEventListener('click', () => {
+        state.actorFocus = null;
+        state.actorRenameModalOpen = false;
         renderActoresView();
       });
 
-      viewActores.querySelectorAll('[data-actor-letter]').forEach((btn) => {
-        btn.addEventListener('click', () => {
-          const next = btn.dataset.actorLetter || '';
-          if (state.actorLetterFilter === next) return;
-          state.actorLetterFilter = next;
-          state.actorFocus = null;
-          state.actorDetailsExpanded = false;
-          renderActoresView();
-        });
-      });
-      viewActores.querySelectorAll('[data-actor-tier-filter]').forEach((input) => {
-        input.addEventListener('change', () => {
-          const filterKey = input.dataset.actorTierFilter;
-          if (!filterKey || !Object.prototype.hasOwnProperty.call(state.actorTierFilters, filterKey)) return;
-          state.actorTierFilters[filterKey] = Boolean(input.checked);
-          renderActoresView();
-        });
-      });
-
-      const toggleBtn = document.getElementById('toggleActorFormBtn');
-      const actorForm = document.getElementById('addActorForm');
-      toggleBtn?.addEventListener('click', () => {
-        const isHidden = actorForm.classList.toggle('mock-form-hidden');
-        toggleBtn.textContent = isHidden ? 'Agregar Nuevo Actor' : 'Cerrar Formulario';
-      });
-
-      // Add Actor Form Submit
-      actorForm?.addEventListener('submit', (e) => {
-        e.preventDefault();
-        const fd = new FormData(e.target);
-        const actorName = String(fd.get('actorName') || '').trim();
-        const charsRaw = String(fd.get('actorCharacters') || '').trim();
-        const chars = charsRaw ? charsRaw.split(',').map(s=>s.trim()).filter(Boolean) : [];
-        if (!actorName) return;
-
-        // SOLUCIÓN AL BUG DE DATOS FANTASMA:
-        // Registramos al actor en el modelo interno (collectionModel) en lugar de inyectar
-        // un objeto basura ('Sin personaje', 'url_youtube: ""') en el array principal VIDEOS.
-        const normalizedActorName = normalizeEntityName(actorName);
-        const existingActor = collectionModel.actors.find(a => normalizeEntityName(a.name) === normalizedActorName);
-        if (!existingActor) {
-          collectionModel.actors.push({
-            id: createModelId('actor', normalizedActorName),
-            name: actorName,
-            characterIds: []
-          });
-          saveCollectionModel(); // Guardamos el modelo para que Firebase lo sincronice
-        }
-
-        chars.forEach((char) => {
-          ensureBlockedPlaceholderForActorCharacter(actorName, char);
-          blockCharacterForActor(actorName, char);
-        });
-
-        saveVideos();
-        refreshDependentViews();
-        state.actorFocus = actorName;
-        state.actorLetterFilter = getActorInitialLetter(actorName);
-        state.actorLetterFilterExpanded = true;
-        state.actorDetailsExpanded = true;
-        renderActoresView();
-      });
-
-      // Edit Actor
       document.getElementById('editActorBtn')?.addEventListener('click', () => {
         state.actorRenameModalOpen = true;
         renderActoresView();
       });
+
       const actorRenameModal = document.getElementById('actorRenameModal');
       const closeActorRenameModal = () => {
         state.actorRenameModalOpen = false;
         renderActoresView();
       };
-      if (actorRenameModal && actor) {
+      if (actorRenameModal) {
         const renameInput = document.getElementById('actorRenameInput');
         const renameValidation = document.getElementById('actorRenameValidation');
         const setRenameValidation = (message = '') => {
@@ -7237,10 +7053,7 @@
           renameInput?.select();
         });
 
-        renameInput?.addEventListener('input', () => {
-          setRenameValidation('');
-        });
-
+        renameInput?.addEventListener('input', () => setRenameValidation(''));
         document.getElementById('cancelActorRenameBtn')?.addEventListener('click', closeActorRenameModal);
         actorRenameModal.addEventListener('click', (event) => {
           if (event.target === actorRenameModal) closeActorRenameModal();
@@ -7249,82 +7062,42 @@
           const cleanName = validateNewActorName();
           if (!cleanName) return;
           VIDEOS.forEach(v => {
-              if (normalizeName(v.actor_de_doblaje) === normalizeName(actor)) {
-                  v.actor_de_doblaje = cleanName;
-              }
+            if (normalizeName(v.actor_de_doblaje) === normalizeName(actor)) v.actor_de_doblaje = cleanName;
           });
           if (state.blockedCharactersByActor[actor]) {
-              state.blockedCharactersByActor[cleanName] = state.blockedCharactersByActor[actor];
-              delete state.blockedCharactersByActor[actor];
+            state.blockedCharactersByActor[cleanName] = state.blockedCharactersByActor[actor];
+            delete state.blockedCharactersByActor[actor];
           }
           state.actorFocus = cleanName;
-          state.actorLetterFilter = getActorInitialLetter(cleanName);
-          state.actorLetterFilterExpanded = true;
           state.actorRenameModalOpen = false;
           saveBlockedCharacters();
           saveVideos();
           refreshDependentViews();
           renderActoresView();
         });
-        actorRenameModal.addEventListener('keydown', (event) => {
-          if (event.key === 'Escape') {
-            event.preventDefault();
-            closeActorRenameModal();
-            return;
-          }
-          if (event.key !== 'Tab') return;
-          const focusable = [...actorRenameModal.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])')]
-            .filter((element) => !element.hasAttribute('disabled'));
-          if (!focusable.length) return;
-          const first = focusable[0];
-          const last = focusable[focusable.length - 1];
-          const active = document.activeElement;
-          if (event.shiftKey && active === first) {
-            event.preventDefault();
-            last.focus();
-          } else if (!event.shiftKey && active === last) {
-            event.preventDefault();
-            first.focus();
-          }
-        });
       }
 
-      // Delete Actor
       document.getElementById('deleteActorBtn')?.addEventListener('click', () => {
         if(!confirm(`¿Seguro que deseas eliminar al actor "${actor}"? Los videos con saludo perderán su actor designado, y los registros bloqueados de este actor se eliminarán.`)) return;
         for (let i = VIDEOS.length - 1; i >= 0; i--) {
-            if (normalizeName(VIDEOS[i].actor_de_doblaje) === normalizeName(actor)) {
-                if (hasGreetingVideo(VIDEOS[i])) {
-                    VIDEOS[i].actor_de_doblaje = 'Sin actor';
-                } else {
-                    VIDEOS.splice(i, 1);
-                }
+          if (normalizeName(VIDEOS[i].actor_de_doblaje) === normalizeName(actor)) {
+            if (hasGreetingVideo(VIDEOS[i])) {
+              VIDEOS[i].actor_de_doblaje = 'Sin actor';
+            } else {
+              VIDEOS.splice(i, 1);
             }
+          }
         }
         delete state.blockedCharactersByActor[actor];
         state.actorFocus = null;
-        state.actorDetailsExpanded = false;
+        state.actorRenameModalOpen = false;
         saveBlockedCharacters();
         saveVideos();
         refreshDependentViews();
         renderActoresView();
       });
 
-      viewActores.querySelectorAll('[data-actor-card]').forEach((btn) => {
-        btn.addEventListener('click', () => {
-          const clickedActor = String(btn.dataset.actorCard || '').trim();
-          if (!clickedActor) return;
-          if (state.actorFocus === clickedActor && state.actorDetailsExpanded) {
-            state.actorDetailsExpanded = false;
-          } else {
-            state.actorFocus = clickedActor;
-            state.actorDetailsExpanded = true;
-          }
-          renderActoresView();
-        });
-      });
       document.getElementById('addBlockedCharacter')?.addEventListener('click', () => {
-        if (!actor) return;
         const input = document.getElementById('blockedCharacterInput');
         const characterName = String(input?.value || '').trim();
         if (!characterName) return;
@@ -7342,9 +7115,7 @@
           && !hasGreetingVideo(video)
         ));
 
-        if (!alreadyRegisteredBlockedVideo) {
-          ensureBlockedPlaceholderForActorCharacter(actor, canonicalCharacterName);
-        }
+        if (!alreadyRegisteredBlockedVideo) ensureBlockedPlaceholderForActorCharacter(actor, canonicalCharacterName);
 
         const current = state.blockedCharactersByActor[actor] || [];
         state.blockedCharactersByActor[actor] = [...new Set([...current, canonicalCharacterName])];

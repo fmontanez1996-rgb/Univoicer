@@ -1688,11 +1688,11 @@
       min-height: 110px;
       padding: 12px 12px 10px;
       border-radius: 16px;
-      border: 1px solid rgba(122, 196, 255, .46);
+      border: 1px solid rgba(136, 171, 210, .88);
       background:
-        radial-gradient(circle at 14% 12%, rgba(255, 243, 150, .14), transparent 30%),
-        radial-gradient(circle at 88% 8%, rgba(255, 166, 87, .16), transparent 28%),
-        linear-gradient(165deg, rgba(12, 24, 48, .94), rgba(19, 37, 70, .84));
+        linear-gradient(115deg, rgba(255, 255, 255, .14) 0%, rgba(255, 255, 255, 0) 38%),
+        radial-gradient(circle at 80% -14%, rgba(255, 255, 255, .18), rgba(255, 255, 255, 0) 56%),
+        linear-gradient(168deg, rgba(26, 34, 49, .98), rgba(15, 21, 33, .98) 52%, rgba(8, 12, 21, .99));
       display: grid;
       grid-template-rows: 1fr auto;
       gap: 6px;
@@ -1701,8 +1701,64 @@
       overflow: hidden;
       transition: transform .26s ease, box-shadow .26s ease, border-color .26s ease, filter .26s ease;
       box-shadow:
-        0 10px 18px rgba(2, 8, 24, .44),
-        0 0 0 1px rgba(180, 227, 255, .08) inset;
+        0 12px 24px rgba(0, 0, 0, .58),
+        0 2px 0 rgba(255, 255, 255, .09) inset,
+        0 -6px 14px rgba(0, 0, 0, .56) inset;
+    }
+    .actor-card--count-1 {
+      border-color: rgba(114, 172, 230, .95);
+      background:
+        linear-gradient(118deg, rgba(204, 231, 255, .22) 0%, rgba(204, 231, 255, 0) 38%),
+        radial-gradient(circle at 82% -10%, rgba(178, 218, 255, .3), rgba(178, 218, 255, 0) 58%),
+        linear-gradient(168deg, rgba(30, 72, 124, .98), rgba(19, 49, 89, .98) 54%, rgba(10, 26, 51, .99));
+      box-shadow:
+        0 12px 24px rgba(2, 9, 21, .62),
+        0 2px 0 rgba(214, 237, 255, .16) inset,
+        0 -7px 14px rgba(3, 12, 28, .6) inset;
+    }
+    .actor-card--count-2 {
+      border-color: rgba(117, 196, 135, .94);
+      background:
+        linear-gradient(118deg, rgba(216, 255, 228, .18) 0%, rgba(216, 255, 228, 0) 38%),
+        radial-gradient(circle at 82% -10%, rgba(177, 232, 188, .26), rgba(177, 232, 188, 0) 58%),
+        linear-gradient(168deg, rgba(31, 88, 66, .98), rgba(20, 62, 46, .99) 54%, rgba(11, 33, 26, .99));
+      box-shadow:
+        0 12px 24px rgba(2, 13, 10, .64),
+        0 2px 0 rgba(218, 255, 231, .14) inset,
+        0 -7px 14px rgba(4, 18, 13, .6) inset;
+    }
+    .actor-card--count-3 {
+      border-color: rgba(226, 196, 105, .96);
+      background:
+        linear-gradient(118deg, rgba(255, 243, 188, .2) 0%, rgba(255, 243, 188, 0) 38%),
+        radial-gradient(circle at 82% -10%, rgba(255, 230, 156, .28), rgba(255, 230, 156, 0) 58%),
+        linear-gradient(168deg, rgba(122, 89, 30, .99), rgba(87, 62, 20, .99) 54%, rgba(48, 34, 11, .99));
+      box-shadow:
+        0 12px 24px rgba(20, 13, 2, .66),
+        0 2px 0 rgba(255, 244, 203, .14) inset,
+        0 -7px 14px rgba(24, 16, 3, .61) inset;
+    }
+    .actor-card--count-4 {
+      border-color: rgba(201, 213, 228, .95);
+      background:
+        linear-gradient(118deg, rgba(255, 255, 255, .24) 0%, rgba(255, 255, 255, 0) 38%),
+        radial-gradient(circle at 82% -10%, rgba(229, 236, 245, .32), rgba(229, 236, 245, 0) 58%),
+        linear-gradient(168deg, rgba(116, 130, 149, .99), rgba(79, 92, 110, .99) 54%, rgba(42, 51, 67, .99));
+      box-shadow:
+        0 12px 24px rgba(8, 11, 18, .64),
+        0 2px 0 rgba(243, 248, 255, .2) inset,
+        0 -7px 14px rgba(7, 10, 16, .58) inset;
+    }
+    .actor-card--count-5 {
+      border-color: rgba(214, 98, 107, .96);
+      background:
+        linear-gradient(118deg, rgba(255, 216, 218, .2) 0%, rgba(255, 216, 218, 0) 38%),
+        radial-gradient(circle at 82% -10%, rgba(255, 181, 188, .3), rgba(255, 181, 188, 0) 58%),
+        linear-gradient(168deg, rgba(123, 30, 44, .99), rgba(90, 20, 32, .99) 54%, rgba(52, 11, 19, .99));
+      box-shadow:
+        0 12px 24px rgba(21, 4, 8, .68),
+        0 2px 0 rgba(255, 220, 224, .14) inset,
+        0 -7px 14px rgba(24, 5, 10, .62) inset;
     }
     .actor-card--platinado {
       border-color: rgba(223, 233, 246, .82);
@@ -1784,6 +1840,25 @@
       color: rgba(161, 170, 191, .64);
       text-shadow: 0 0 10px rgba(108, 114, 135, .56);
     }
+    .actor-card--fully-unlocked {
+      border-color: rgba(255, 228, 142, .96);
+      box-shadow:
+        0 15px 30px rgba(0, 0, 0, .6),
+        0 2px 0 rgba(255, 242, 197, .2) inset,
+        0 -7px 14px rgba(0, 0, 0, .52) inset,
+        0 0 0 2px rgba(255, 218, 110, .38),
+        0 0 26px rgba(255, 198, 88, .42);
+    }
+    .actor-card--fully-unlocked::before {
+      content: '';
+      position: absolute;
+      inset: -1px;
+      border-radius: inherit;
+      pointer-events: none;
+      background: linear-gradient(132deg, rgba(255, 240, 186, .26), rgba(255, 240, 186, 0) 42%);
+      mix-blend-mode: screen;
+      opacity: .92;
+    }
     .actor-card:hover {
       transform: translateY(-4px) scale(1.012);
       border-color: rgba(146, 224, 255, .85);
@@ -1792,6 +1867,17 @@
         0 0 0 1px rgba(190, 235, 255, .24) inset,
         0 0 22px rgba(113, 203, 255, .34);
       filter: saturate(1.08);
+    }
+    .actor-card--fully-unlocked:hover,
+    .actor-card--fully-unlocked.active {
+      border-color: rgba(255, 232, 157, .98);
+      box-shadow:
+        0 18px 32px rgba(0, 0, 0, .62),
+        0 2px 0 rgba(255, 244, 209, .24) inset,
+        0 -7px 14px rgba(0, 0, 0, .5) inset,
+        0 0 0 2px rgba(255, 222, 122, .46),
+        0 0 34px rgba(255, 207, 97, .56);
+      filter: saturate(1.12);
     }
     .actor-card--platinado:hover {
       border-color: rgba(242, 248, 255, .95);
@@ -1829,6 +1915,15 @@
         0 0 30px rgba(102, 212, 255, .48),
         var(--accent-glow);
       transform: translateY(-4px);
+    }
+    .actor-card--fully-unlocked.active {
+      border-color: rgba(255, 232, 157, .98);
+      box-shadow:
+        0 18px 32px rgba(0, 0, 0, .62),
+        0 2px 0 rgba(255, 244, 209, .24) inset,
+        0 -7px 14px rgba(0, 0, 0, .5) inset,
+        0 0 0 2px rgba(255, 222, 122, .46),
+        0 0 34px rgba(255, 207, 97, .56);
     }
     .actor-card-title {
       margin: 0;
@@ -1872,7 +1967,7 @@
     .actor-card-footer {
       display: flex;
       justify-content: space-between;
-      align-items: center;
+      align-items: flex-end;
       flex-wrap: wrap;
       width: 100%;
       gap: 8px;
@@ -1884,6 +1979,14 @@
       font-weight: 700;
       letter-spacing: .02em;
       white-space: normal;
+    }
+    .actor-card-meta--left {
+      margin-right: auto;
+      text-align: left;
+    }
+    .actor-card-meta--right {
+      margin-left: auto;
+      text-align: right;
     }
     .actor-card-progress {
       display: grid;

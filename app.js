@@ -5868,6 +5868,7 @@
       const cardName = String(item?.name || item?.characterName || '').trim();
       if (!cardName) return '';
       const locked = Boolean(options.locked ?? !item?.unlocked);
+      const openCharacter = options.openCharacter ?? !locked;
       const floatDelay = options.floatDelay || `-${(Math.random() * 2.6).toFixed(2)}s`;
       const characterNameSize = getCharacterNameFontSize(cardName);
       const cardRoleTier = roleTierFromData(item?.rol, item?.categoriaRol, item?.rareza || '');
@@ -5901,7 +5902,7 @@
         <button
           type="button"
           class="character-gallery-card ${cardRoleClass}"
-          data-open-character="${cardName}"
+          ${openCharacter ? `data-open-character="${cardName}"` : ""}
           data-role-tier="${cardRoleTier}"
           data-locked="${locked ? 'true' : 'false'}"
           style="--float-delay:${floatDelay}; --rarity-color:${cardRoleColor};"
@@ -6940,44 +6941,60 @@
       if (!actor || !state.actorDetailsExpanded) {
         state.actorRenameModalOpen = false;
       }
-      const actorEntries = VIDEOS.filter(v => (v.actor_de_doblaje || 'Sin actor') === actor);
-      const actorVideos = actorEntries.filter(v => hasGreetingVideo(v));
-      const actorCharacters = [...new Set(actorEntries.map(v => v.personaje || 'Sin personaje'))];
-      const blockedCharacters = state.blockedCharactersByActor[actor] || [];
-      const blockedOnly = blockedCharacters.filter(name => !actorCharacters.includes(name));
-      const actorCharacterCards = [
-        ...actorCharacters.map((characterName) => {
-          const relatedVideo = actorVideos.find(item => (item.personaje || 'Sin personaje') === characterName && hasGreetingVideo(item));
-          const roleData = highestRoleCategoryForActorCharacter(actor, characterName);
+      const actorEntries = VIDEOS.filter((video) => (video.actor_de_doblaje || 'Sin actor') === actor);
+      const actorVideos = actorEntries.filter((video) => hasGreetingVideo(video));
+      const blockedCharacters = Array.isArray(state.blockedCharactersByActor?.[actor])
+        ? state.blockedCharactersByActor[actor]
+        : [];
+      const normalizedActorCards = new Map();
+      let actorCardOrder = 0;
+
+      const upsertActorCharacterCard = (rawCharacterName, { unlocked = false } = {}) => {
+        const cleanName = String(rawCharacterName || '').trim() || 'Sin personaje';
+        const normalizedName = normalizeName(cleanName);
+        if (!normalizedName) return;
+        const existing = normalizedActorCards.get(normalizedName);
+        if (existing) {
+          existing.unlocked = existing.unlocked || unlocked;
+          if (!existing.coverVideo && unlocked) {
+            existing.coverVideo = actorVideos.find((item) => normalizeName(item.personaje || 'Sin personaje') === normalizedName) || null;
+          }
+          return;
+        }
+        const coverVideo = unlocked
+          ? actorVideos.find((item) => normalizeName(item.personaje || 'Sin personaje') === normalizedName) || null
+          : null;
+        normalizedActorCards.set(normalizedName, {
+          name: cleanName,
+          coverVideo,
+          unlocked,
+          order: actorCardOrder
+        });
+        actorCardOrder += 1;
+      };
+
+      actorEntries.forEach((video) => upsertActorCharacterCard(video.personaje || 'Sin personaje', { unlocked: hasGreetingVideo(video) }));
+      blockedCharacters.forEach((characterName) => upsertActorCharacterCard(characterName, { unlocked: false }));
+
+      const actorCharacterCards = [...normalizedActorCards.values()]
+        .map((item) => {
+          const roleData = highestRoleCategoryForActorCharacter(actor, item.name);
           return {
-            characterName,
-            unlocked: Boolean(relatedVideo),
-            rarity: roleData.label,
-            rarityClassName: rarityClass(roleData.label),
+            name: item.name,
+            coverVideo: item.coverVideo,
+            unlocked: item.unlocked,
             rol: roleData.rol,
             categoriaRol: roleData.categoriaRol,
-            video: relatedVideo || null
-          };
-        }),
-        ...blockedOnly.map((characterName) => {
-          const normalizedCharacter = normalizeName(characterName);
-          const matchingEntries = VIDEOS.filter((video) => normalizeName(video.personaje || 'Sin personaje') === normalizedCharacter);
-          const representative = matchingEntries[0] || {};
-          const rarity = roleLabel(
-            normalizeRole(representative.rol || representative.role),
-            normalizeRoleCategory(representative.categoriaRol || representative.roleCategory)
-          );
-          return {
-            characterName,
-            unlocked: false,
-            rarity,
-            rarityClassName: rarityClass(rarity),
-            rol: bestRoleData?.rol || 'Bloqueado',
-            categoriaRol: bestRoleData?.categoriaRol || '',
-            video: null
+            order: item.order
           };
         })
-      ];
+        .sort((a, b) => {
+          if (a.unlocked !== b.unlocked) return a.unlocked ? -1 : 1;
+          const byName = a.name.localeCompare(b.name, 'es', { sensitivity: 'base' });
+          if (byName !== 0) return byName;
+          return a.order - b.order;
+        });
+      const actorCharacters = actorCharacterCards.map((item) => item.name);
       const actorInlineDetailMarkup = actor && state.actorDetailsExpanded ? `
         <article class="mock-box actor-detail-grid mock-gap-md toon-panel actor-inline-detail">
           <div>
@@ -6996,14 +7013,10 @@
             <ul class="actor-character-list">
               ${actorCharacterCards.map((item) => `
                 <li class="actor-character-item">
-                  ${renderCharacterGalleryCard({
-                    name: item.characterName,
-                    coverVideo: item.video || null,
-                    rareza: item.rarity,
-                    rol: item.rol,
-                    categoriaRol: item.categoriaRol,
-                    unlocked: item.unlocked
-                  }, { locked: !item.unlocked })}
+                  ${renderCharacterGalleryCard(item, {
+                    locked: !item.unlocked,
+                    openCharacter: item.unlocked
+                  })}
                 </li>
               `).join('') || '<li class="actor-character-item"><p class="muted">Sin personajes registrados.</p></li>'}
             </ul>

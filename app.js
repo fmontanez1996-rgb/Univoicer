@@ -35,6 +35,7 @@
       },
       actorDetailsExpanded: false,
       actorRenameModalOpen: false,
+      actorDeleteModalOpen: false,
       showAddForm: false,
       universeAddMode: 'video',
       showEditUniverseForm: false,
@@ -6939,6 +6940,7 @@
       const actor = state.actorFocus || null;
       if (!actor || !state.actorDetailsExpanded) {
         state.actorRenameModalOpen = false;
+        state.actorDeleteModalOpen = false;
       }
       const actorEntries = VIDEOS.filter(v => (v.actor_de_doblaje || 'Sin actor') === actor);
       const actorVideos = actorEntries.filter(v => hasGreetingVideo(v));
@@ -6985,7 +6987,7 @@
               <h3 class="actor-detail-title"><span class="actor-detail-name">${escapeHtml(actor)}</span></h3>
               <div class="actions actor-detail-actions">
               <button id="editActorBtn" class="neon-btn actor-icon-btn actor-icon-btn--edit" aria-label="Editar actor" title="Editar actor">✏️</button>
-              <button id="deleteActorBtn" class="neon-btn actor-icon-btn actor-icon-btn--danger" aria-label="Eliminar actor" title="Eliminar actor">🗑️</button>
+              <button id="deleteActorBtn" class="neon-btn actor-icon-btn actor-icon-btn--danger" aria-label="Eliminar actor con agujero negro" title="Eliminar actor con agujero negro">🕳️</button>
               </div>
             </div>
             <p class="muted">Personajes: ${actorCharacters.length} · Videos: ${actorVideos.length}</p>
@@ -7099,6 +7101,18 @@
                 <div class="actions">
                   <button id="saveActorRenameBtn" class="neon-btn neon-btn--primary">Guardar</button>
                   <button id="cancelActorRenameBtn" class="neon-btn">Cancelar</button>
+                </div>
+              </article>
+            </section>
+          ` : ''}
+          ${actor && state.actorDetailsExpanded && state.actorDeleteModalOpen ? `
+            <section id="actorDeleteModal" class="detail-modal actor-delete-modal" role="dialog" aria-modal="true" aria-labelledby="actorDeleteTitle">
+              <article class="detail-content mock-box actor-delete-panel" data-actor-delete-panel>
+                <h3 id="actorDeleteTitle" class="no-margin toon-title">¿Está seguro que desea eliminar?</h3>
+                <p class="muted no-margin">El actor <strong>${escapeHtml(actor)}</strong> se eliminará y sus relaciones se actualizarán.</p>
+                <div class="actions">
+                  <button id="confirmActorDeleteBtn" class="neon-btn neon-btn--primary">Aceptar</button>
+                  <button id="cancelActorDeleteBtn" class="neon-btn">Cancelar</button>
                 </div>
               </article>
             </section>
@@ -7278,24 +7292,67 @@
 
       // Delete Actor
       document.getElementById('deleteActorBtn')?.addEventListener('click', () => {
-        if(!confirm(`¿Seguro que deseas eliminar al actor "${actor}"? Los videos con saludo perderán su actor designado, y los registros bloqueados de este actor se eliminarán.`)) return;
-        for (let i = VIDEOS.length - 1; i >= 0; i--) {
-            if (normalizeName(VIDEOS[i].actor_de_doblaje) === normalizeName(actor)) {
-                if (hasGreetingVideo(VIDEOS[i])) {
-                    VIDEOS[i].actor_de_doblaje = 'Sin actor';
-                } else {
-                    VIDEOS.splice(i, 1);
-                }
-            }
-        }
-        delete state.blockedCharactersByActor[actor];
-        state.actorFocus = null;
-        state.actorDetailsExpanded = false;
-        saveBlockedCharacters();
-        saveVideos();
-        refreshDependentViews();
+        state.actorDeleteModalOpen = true;
         renderActoresView();
       });
+      const actorDeleteModal = document.getElementById('actorDeleteModal');
+      const closeActorDeleteModal = () => {
+        state.actorDeleteModalOpen = false;
+        renderActoresView();
+      };
+      if (actorDeleteModal && actor) {
+        const cancelActorDeleteBtn = document.getElementById('cancelActorDeleteBtn');
+        const confirmActorDeleteBtn = document.getElementById('confirmActorDeleteBtn');
+
+        requestAnimationFrame(() => {
+          confirmActorDeleteBtn?.focus();
+        });
+
+        cancelActorDeleteBtn?.addEventListener('click', closeActorDeleteModal);
+        actorDeleteModal.addEventListener('click', (event) => {
+          if (event.target === actorDeleteModal) closeActorDeleteModal();
+        });
+        confirmActorDeleteBtn?.addEventListener('click', () => {
+          for (let i = VIDEOS.length - 1; i >= 0; i--) {
+              if (normalizeName(VIDEOS[i].actor_de_doblaje) === normalizeName(actor)) {
+                  if (hasGreetingVideo(VIDEOS[i])) {
+                      VIDEOS[i].actor_de_doblaje = 'Sin actor';
+                  } else {
+                      VIDEOS.splice(i, 1);
+                  }
+              }
+          }
+          delete state.blockedCharactersByActor[actor];
+          state.actorFocus = null;
+          state.actorDetailsExpanded = false;
+          state.actorDeleteModalOpen = false;
+          saveBlockedCharacters();
+          saveVideos();
+          refreshDependentViews();
+          renderActoresView();
+        });
+        actorDeleteModal.addEventListener('keydown', (event) => {
+          if (event.key === 'Escape') {
+            event.preventDefault();
+            closeActorDeleteModal();
+            return;
+          }
+          if (event.key !== 'Tab') return;
+          const focusable = [...actorDeleteModal.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])')]
+            .filter((element) => !element.hasAttribute('disabled'));
+          if (!focusable.length) return;
+          const first = focusable[0];
+          const last = focusable[focusable.length - 1];
+          const active = document.activeElement;
+          if (event.shiftKey && active === first) {
+            event.preventDefault();
+            last.focus();
+          } else if (!event.shiftKey && active === last) {
+            event.preventDefault();
+            first.focus();
+          }
+        });
+      }
 
       viewActores.querySelectorAll('[data-actor-card]').forEach((btn) => {
         btn.addEventListener('click', () => {

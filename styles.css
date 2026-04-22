@@ -2062,6 +2062,7 @@
     .actor-icon-btn--danger {
       color: #ffc8c8;
       border-color: rgba(255, 174, 174, .82);
+      font-size: 1.2rem;
     }
     .actor-icon-btn--danger:hover,
     .actor-icon-btn--danger:focus-visible {
@@ -2756,6 +2757,15 @@
       color: #ffb6b6;
       min-height: 1.2em;
       font-size: .9rem;
+    }
+    .actor-delete-modal {
+      z-index: 40;
+    }
+    .actor-delete-panel {
+      width: min(520px, 100%);
+      max-height: min(520px, calc(100vh - 36px));
+      display: grid;
+      gap: 10px;
     }
     .detail-content .holo-card {
       border: 1px solid rgba(130, 214, 255, .52);

@@ -6875,9 +6875,52 @@
 
             <div class="actor-gallery mock-gap-lg">
               ${actors.map((name) => `
-                <button type="button" class="actor-card" data-actor-card="${escapeHtml(name)}">
+                ${(() => {
+                  const normalizedActorName = normalizeName(name);
+                  const actorVideos = VIDEOS.filter((video) => normalizeName(video.actor_de_doblaje || '') === normalizedActorName);
+                  const characterNamesByNormalized = new Map();
+
+                  actorVideos.forEach((video) => {
+                    const characterName = String(video.personaje || '').trim();
+                    const normalizedCharacterName = normalizeName(characterName);
+                    if (!normalizedCharacterName) return;
+                    if (!characterNamesByNormalized.has(normalizedCharacterName)) characterNamesByNormalized.set(normalizedCharacterName, characterName);
+                  });
+
+                  const blockedCharacters = Object.entries(state.blockedCharactersByActor || {})
+                    .filter(([actorName]) => normalizeName(actorName || '') === normalizedActorName)
+                    .flatMap(([, list]) => (Array.isArray(list) ? list : []));
+
+                  blockedCharacters.forEach((characterName) => {
+                    const cleanCharacterName = String(characterName || '').trim();
+                    const normalizedCharacterName = normalizeName(cleanCharacterName);
+                    if (!normalizedCharacterName) return;
+                    if (characterNamesByNormalized.has(normalizedCharacterName)) return;
+                    const canonicalCharacterName = VIDEOS.find((video) => normalizeName(video.personaje || '') === normalizedCharacterName)?.personaje || cleanCharacterName;
+                    characterNamesByNormalized.set(normalizedCharacterName, canonicalCharacterName);
+                  });
+
+                  const totalCharacters = characterNamesByNormalized.size;
+                  const unlockedCharacters = [...characterNamesByNormalized.keys()].filter((normalizedCharacterName) => (
+                    actorVideos.some((video) => (
+                      normalizeName(video.personaje || '') === normalizedCharacterName
+                      && hasGreetingVideo(video)
+                    ))
+                  )).length;
+
+                  const countClass = totalCharacters >= 5
+                    ? 'actor-card--count-5'
+                    : `actor-card--count-${Math.max(1, totalCharacters)}`;
+                  const fullyUnlockedClass = unlockedCharacters === totalCharacters && totalCharacters > 0
+                    ? ' actor-card--fully-unlocked'
+                    : '';
+
+                  return `
+                <button type="button" class="actor-card ${countClass}${fullyUnlockedClass}" data-actor-card="${escapeHtml(name)}">
                   <h3 class="actor-card-title">${escapeHtml(name)}</h3>
                 </button>
+              `;
+                })()}
               `).join('') || '<p class="muted">No hay actores registrados.</p>'}
             </div>
           </section>

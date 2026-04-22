@@ -4359,7 +4359,8 @@
           }
         }
         state.universe = cleanName;
-        state.editUniverseFeedback = { type: 'success', text: 'Universo actualizado correctamente.' };
+        state.editUniverseFeedback = { type: '', text: '' };
+        state.showEditUniverseForm = false;
         sanitizeUniverseMembershipsAndPersist();
         saveUniverseMemberships();
         saveUniverseNodes();

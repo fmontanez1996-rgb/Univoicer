@@ -5854,6 +5854,7 @@
       const cardName = String(item?.name || item?.characterName || '').trim();
       if (!cardName) return '';
       const locked = Boolean(options.locked ?? !item?.unlocked);
+      const openCharacter = options.openCharacter ?? !locked;
       const floatDelay = options.floatDelay || `-${(Math.random() * 2.6).toFixed(2)}s`;
       const characterNameSize = getCharacterNameFontSize(cardName);
       const cardRoleTier = roleTierFromData(item?.rol, item?.categoriaRol, item?.rareza || '');
@@ -5887,7 +5888,7 @@
         <button
           type="button"
           class="character-gallery-card ${cardRoleClass}"
-          data-open-character="${cardName}"
+          ${openCharacter ? `data-open-character="${cardName}"` : ""}
           data-role-tier="${cardRoleTier}"
           data-locked="${locked ? 'true' : 'false'}"
           style="--float-delay:${floatDelay}; --rarity-color:${cardRoleColor};"

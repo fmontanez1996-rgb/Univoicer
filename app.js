@@ -6981,7 +6981,7 @@
         <article class="mock-box actor-detail-grid mock-gap-md toon-panel actor-inline-detail">
           <div>
             <div class="actor-detail-header">
-              <h3 class="actor-detail-title"><span class="actor-detail-name">${actor}</span></h3>
+              <h3 class="actor-detail-title"><span class="actor-detail-name">${escapeHtml(actor)}</span></h3>
               <div class="actions actor-detail-actions">
               <button id="editActorBtn" class="neon-btn actor-icon-btn actor-icon-btn--edit" aria-label="Editar actor" title="Editar actor">✏️</button>
               <button id="deleteActorBtn" class="neon-btn actor-icon-btn actor-icon-btn--danger" aria-label="Eliminar actor" title="Eliminar actor">🗑️</button>
@@ -7069,9 +7069,9 @@
 
           <div class="actor-gallery mock-gap-lg">
             ${filteredActorSummaries.map((item, idx) => `
-              <button type="button" class="actor-card actor-card--${item.tier.key} actor-card--tier-${item.tier.key} ${item.name === actor ? 'active' : ''}" data-actor-card="${item.name}">
-                <h3 class="actor-card-title">${item.name}</h3>
-                <p class="actor-card-tier actor-card-tier--${item.tier.key}">${item.tierLabel}</p>
+              <button type="button" class="actor-card actor-card--${item.tier.key} actor-card--tier-${item.tier.key} ${item.name === actor ? 'active' : ''}" data-actor-card="${escapeHtml(item.name)}">
+                <h3 class="actor-card-title">${escapeHtml(item.name)}</h3>
+                <p class="actor-card-tier actor-card-tier--${item.tier.key}">${escapeHtml(item.tierLabel)}</p>
                 <div class="actor-card-footer">
                   <p class="actor-card-meta">Personajes: ${item.totalCharactersCount}</p>
                   <p class="actor-card-meta">Desbloqueados: ${item.unlockedCharactersCount}</p>
@@ -7080,7 +7080,7 @@
                   <div class="actor-card-progress-track">
                     <div class="actor-card-progress-fill" style="width: ${item.completionPercent}%;"></div>
                   </div>
-                  <p class="actor-card-progress-label">${item.completionLabel}</p>
+                  <p class="actor-card-progress-label">${escapeHtml(item.completionLabel)}</p>
                 </div>
               </button>
               ${selectedActorRowEndIndex === idx ? actorInlineDetailMarkup : ''}

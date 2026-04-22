@@ -24,6 +24,7 @@
       selectedVideoId: null,
       actorFocus: null,
       actorRenameModalOpen: false,
+      actorDeleteModalOpen: false,
       showAddForm: false,
       universeAddMode: 'video',
       showEditUniverseForm: false,
@@ -6847,6 +6848,7 @@
       if (state.actorFocus && !actors.some((name) => normalizeName(name) === normalizeName(state.actorFocus))) {
         state.actorFocus = null;
         state.actorRenameModalOpen = false;
+        state.actorDeleteModalOpen = false;
       }
 
       const actor = state.actorFocus ? actors.find((name) => normalizeName(name) === normalizeName(state.actorFocus)) || state.actorFocus : null;
@@ -7001,6 +7003,18 @@
               </article>
             </section>
           ` : ''}
+          ${actor && state.actorDetailsExpanded && state.actorDeleteModalOpen ? `
+            <section id="actorDeleteModal" class="detail-modal actor-delete-modal" role="dialog" aria-modal="true" aria-labelledby="actorDeleteTitle">
+              <article class="detail-content mock-box actor-delete-panel" data-actor-delete-panel>
+                <h3 id="actorDeleteTitle" class="no-margin toon-title">¿Está seguro que desea eliminar?</h3>
+                <p class="muted no-margin">El actor <strong>${escapeHtml(actor)}</strong> se eliminará y sus relaciones se actualizarán.</p>
+                <div class="actions">
+                  <button id="confirmActorDeleteBtn" class="neon-btn neon-btn--primary">Aceptar</button>
+                  <button id="cancelActorDeleteBtn" class="neon-btn">Cancelar</button>
+                </div>
+              </article>
+            </section>
+          ` : ''}
         </section>
       `;
 
@@ -7096,6 +7110,64 @@
         refreshDependentViews();
         renderActoresView();
       });
+      const actorDeleteModal = document.getElementById('actorDeleteModal');
+      const closeActorDeleteModal = () => {
+        state.actorDeleteModalOpen = false;
+        renderActoresView();
+      };
+      if (actorDeleteModal && actor) {
+        const cancelActorDeleteBtn = document.getElementById('cancelActorDeleteBtn');
+        const confirmActorDeleteBtn = document.getElementById('confirmActorDeleteBtn');
+
+        requestAnimationFrame(() => {
+          confirmActorDeleteBtn?.focus();
+        });
+
+        cancelActorDeleteBtn?.addEventListener('click', closeActorDeleteModal);
+        actorDeleteModal.addEventListener('click', (event) => {
+          if (event.target === actorDeleteModal) closeActorDeleteModal();
+        });
+        confirmActorDeleteBtn?.addEventListener('click', () => {
+          for (let i = VIDEOS.length - 1; i >= 0; i--) {
+              if (normalizeName(VIDEOS[i].actor_de_doblaje) === normalizeName(actor)) {
+                  if (hasGreetingVideo(VIDEOS[i])) {
+                      VIDEOS[i].actor_de_doblaje = 'Sin actor';
+                  } else {
+                      VIDEOS.splice(i, 1);
+                  }
+              }
+          }
+          delete state.blockedCharactersByActor[actor];
+          state.actorFocus = null;
+          state.actorDetailsExpanded = false;
+          state.actorDeleteModalOpen = false;
+          saveBlockedCharacters();
+          saveVideos();
+          refreshDependentViews();
+          renderActoresView();
+        });
+        actorDeleteModal.addEventListener('keydown', (event) => {
+          if (event.key === 'Escape') {
+            event.preventDefault();
+            closeActorDeleteModal();
+            return;
+          }
+          if (event.key !== 'Tab') return;
+          const focusable = [...actorDeleteModal.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])')]
+            .filter((element) => !element.hasAttribute('disabled'));
+          if (!focusable.length) return;
+          const first = focusable[0];
+          const last = focusable[focusable.length - 1];
+          const active = document.activeElement;
+          if (event.shiftKey && active === first) {
+            event.preventDefault();
+            last.focus();
+          } else if (!event.shiftKey && active === last) {
+            event.preventDefault();
+            first.focus();
+          }
+        });
+      }
 
       document.getElementById('addBlockedCharacter')?.addEventListener('click', () => {
         const input = document.getElementById('blockedCharacterInput');

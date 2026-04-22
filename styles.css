@@ -1984,31 +1984,45 @@
       border-bottom: 1px solid color-mix(in srgb, var(--neon-cyan) 58%, rgba(167, 213, 255, .26));
       box-shadow: 0 1px 0 color-mix(in srgb, var(--neon-purple) 36%, transparent);
     }
-    .actor-detail-title {
-      margin: 6px 0 2px;
-      font-size: clamp(1.9rem, 4.8vw, 3.2rem);
-      font-weight: 900;
-      letter-spacing: .03em;
-      line-height: 1.05;
-      text-align: center;
-      color: #ffe97a;
-      text-shadow:
-        0 1px 0 rgba(255, 159, 47, .76),
-        0 3px 0 rgba(84, 46, 18, .92),
-        0 0 16px rgba(255, 229, 90, .34);
+    .actor-profile-header {
+      position: relative;
+      overflow: hidden;
+      border-radius: 18px;
+      padding: 10px 14px 12px;
+      background:
+        radial-gradient(circle at 14% 14%, rgba(255, 255, 255, .18), transparent 44%),
+        repeating-linear-gradient(135deg, rgba(255, 255, 255, .09) 0 8px, rgba(255, 255, 255, 0) 8px 16px),
+        linear-gradient(135deg, rgba(17, 62, 121, .82), rgba(89, 35, 146, .8) 54%, rgba(130, 64, 42, .76));
+      border: 2px solid color-mix(in srgb, var(--neon-cyan) 60%, #fff3ad 40%);
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, .26),
+        inset 0 -12px 14px rgba(8, 16, 35, .34),
+        0 10px 20px rgba(0, 0, 0, .4);
     }
-    .actor-detail-name {
-      display: inline-block;
-      background: linear-gradient(180deg, #ffe97a 0%, #ffd23f 52%, #ff9f2f 100%);
+    .actor-profile-title {
+      margin: 4px 0 0;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      width: 100%;
+      font-family: "Comic Sans MS", "Chalkboard SE", "Marker Felt", "Trebuchet MS", cursive, sans-serif;
+      font-size: clamp(2.1rem, 6vw, 4rem);
+      font-weight: 900;
+      letter-spacing: .04em;
+      line-height: 1.02;
+      text-align: center;
+      text-transform: uppercase;
+      background: linear-gradient(180deg, #fff6a6 0%, #ffd34d 48%, #ff9f2f 100%);
       -webkit-background-clip: text;
       background-clip: text;
       -webkit-text-fill-color: transparent;
-      -webkit-text-stroke: .8px rgba(52, 26, 9, .9);
+      -webkit-text-stroke: 1px rgba(52, 26, 9, .9);
       text-shadow:
-        0 1px 0 rgba(255, 170, 54, .82),
-        0 4px 0 rgba(72, 36, 13, .95),
-        0 0 12px rgba(255, 235, 120, .45);
-      filter: brightness(1.03) contrast(1.04);
+        0 2px 0 rgba(255, 161, 58, .86),
+        0 5px 0 rgba(75, 38, 14, .95),
+        0 0 20px rgba(255, 230, 117, .5);
+      filter: drop-shadow(0 7px 0 rgba(8, 16, 35, .52)) brightness(1.04) contrast(1.08);
       transform-origin: center;
       animation: toonPulse 2.6s ease-in-out infinite;
     }
@@ -2155,7 +2169,7 @@
         0 0 24px color-mix(in srgb, var(--rarity-color, rgba(130, 186, 255, .7)) 24%, transparent);
     }
     .actor-panel-title,
-    .actor-detail-title {
+    .actor-profile-title {
       display: inline-flex;
       align-items: center;
       gap: 8px;
@@ -2165,9 +2179,9 @@
       font-size: 1.05rem;
       filter: drop-shadow(0 0 7px rgba(126, 214, 255, .56));
     }
-    .actor-detail-title::before {
+    .actor-profile-title::before {
       content: '🎭';
-      font-size: 1rem;
+      font-size: clamp(1rem, 1.2vw, 1.3rem);
       display: inline-block;
       transform-origin: center;
       animation: actorIconBob 2.2s ease-in-out infinite;
@@ -2182,22 +2196,28 @@
       }
     }
     @media (max-width: 720px) {
-      .actor-detail-title {
+      .actor-profile-header {
+        padding: 8px 10px 10px;
+      }
+      .actor-profile-title {
+        font-size: clamp(1.7rem, 8.2vw, 2.4rem);
         text-shadow:
           0 1px 0 rgba(255, 159, 47, .6),
           0 2px 0 rgba(84, 46, 18, .82),
           0 0 10px rgba(255, 229, 90, .22);
       }
-      .actor-detail-name {
-        -webkit-text-stroke: .6px rgba(52, 26, 9, .85);
-        text-shadow:
-          0 1px 0 rgba(255, 170, 54, .72),
-          0 2px 0 rgba(72, 36, 13, .88),
-          0 0 9px rgba(255, 235, 120, .3);
+      .actor-profile-title {
+        -webkit-text-stroke: .7px rgba(52, 26, 9, .85);
         animation-duration: 2.9s;
       }
-      .actor-detail-title::before {
+      .actor-profile-title::before {
         filter: drop-shadow(0 1px 0 rgba(96, 56, 21, .7)) drop-shadow(0 0 5px rgba(255, 224, 109, .3));
+      }
+    }
+    @media (min-width: 1024px) {
+      .actor-profile-title {
+        font-size: clamp(2.8rem, 4.1vw, 4.5rem);
+        letter-spacing: .05em;
       }
     }
     .actor-action-btn::after {

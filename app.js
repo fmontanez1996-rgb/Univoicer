@@ -6981,8 +6981,8 @@
       const actorInlineDetailMarkup = actor && state.actorDetailsExpanded ? `
         <article class="mock-box actor-detail-grid mock-gap-md toon-panel actor-inline-detail">
           <div>
-            <div class="actor-detail-header">
-              <h3 class="actor-detail-title"><span class="actor-detail-name">${escapeHtml(actor)}</span></h3>
+            <div class="actor-detail-header actor-profile-header">
+              <h1 class="actor-profile-title">${escapeHtml(actor)}</h1>
               <div class="actions actor-detail-actions">
               <button id="editActorBtn" class="neon-btn actor-icon-btn actor-icon-btn--edit" aria-label="Editar actor" title="Editar actor">✏️</button>
               <button id="deleteActorBtn" class="neon-btn actor-icon-btn actor-icon-btn--danger" aria-label="Eliminar actor" title="Eliminar actor">🗑️</button>

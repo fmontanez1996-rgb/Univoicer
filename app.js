@@ -7297,9 +7297,11 @@
         renderActoresView();
       });
 
-      viewActores.querySelectorAll('[data-actor-card]').forEach((btn) => {
+      viewActores.querySelectorAll('[data-actor-index]').forEach((btn) => {
         btn.addEventListener('click', () => {
-          const clickedActor = btn.dataset.actorCard;
+          const actorIndex = Number.parseInt(btn.dataset.actorIndex || '', 10);
+          if (Number.isNaN(actorIndex) || !filteredActorSummaries[actorIndex]) return;
+          const clickedActor = filteredActorSummaries[actorIndex].name;
           if (!clickedActor) return;
           if (state.actorFocus === clickedActor && state.actorDetailsExpanded) {
             state.actorDetailsExpanded = false;

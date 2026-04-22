@@ -3018,7 +3018,6 @@
       const WHEEL_ZOOM_FACTOR = 1.1;
       const DRAG_OPEN_THRESHOLD = 8;
       const DROP_TARGET_EDGE_SNAP_DISTANCE = 44;
-      const DROP_TARGET_CENTER_SNAP_DISTANCE = 86;
 
       const syncMapZoomDisplay = (scaleValue) => {
         const percentage = `${Math.round(scaleValue * 100)}%`;
@@ -3300,15 +3299,25 @@
         });
       };
 
+      const getVisibleUniverseNodeIdsOnMap = () => {
+        const childUniverseIds = new Set(Object.keys(state.universeMemberships || {}));
+        return new Set(
+          state.universeNodes
+            .filter((node) => !childUniverseIds.has(node.id) || node.isFavorite === true)
+            .map((node) => node.id)
+        );
+      };
+
       const findDropTargetForNode = (activeNode) => {
         if (!activeNode) return null;
+        const visibleNodeIds = getVisibleUniverseNodeIdsOnMap();
         let best = null;
         state.universeNodes.forEach((candidateNode) => {
           if (!candidateNode || candidateNode.id === activeNode.id) return;
+          if (!visibleNodeIds.has(candidateNode.id)) return;
           const dx = candidateNode.x - activeNode.x;
           const dy = candidateNode.y - activeNode.y;
           const centerDistance = Math.hypot(dx, dy);
-          if (centerDistance > DROP_TARGET_CENTER_SNAP_DISTANCE) return;
           const edgeGapX = Math.max(0, Math.abs(dx) - (NODE_HALF_WIDTH * 2));
           const edgeGapY = Math.max(0, Math.abs(dy) - (NODE_HALF_HEIGHT * 2));
           const edgeDistance = Math.hypot(edgeGapX, edgeGapY);

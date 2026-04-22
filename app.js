@@ -6841,6 +6841,45 @@
         if (!normalizedName || normalizedName === normalizeName('Sin actor')) return;
         if (!actorNameByNormalized.has(normalizedName)) actorNameByNormalized.set(normalizedName, cleanName);
       };
+      const getActorCharacterStats = (actorName) => {
+        const normalizedActorName = normalizeName(actorName);
+        const actorEntries = VIDEOS.filter(
+          (video) => normalizeName(video.actor_de_doblaje || 'Sin actor') === normalizedActorName
+        );
+        const blockedCharacters = Array.isArray(state.blockedCharactersByActor[actorName])
+          ? state.blockedCharactersByActor[actorName]
+          : [];
+
+        const totalCharactersByNormalized = new Map();
+        actorEntries.forEach((video) => {
+          const characterName = String(video.personaje || '').trim();
+          const normalizedCharacter = normalizeName(characterName);
+          if (!normalizedCharacter) return;
+          if (!totalCharactersByNormalized.has(normalizedCharacter)) {
+            totalCharactersByNormalized.set(normalizedCharacter, characterName || 'Sin personaje');
+          }
+        });
+        blockedCharacters.forEach((characterName) => {
+          const cleanName = String(characterName || '').trim();
+          const normalizedCharacter = normalizeName(cleanName);
+          if (!normalizedCharacter) return;
+          if (!totalCharactersByNormalized.has(normalizedCharacter)) {
+            totalCharactersByNormalized.set(normalizedCharacter, cleanName || 'Sin personaje');
+          }
+        });
+
+        const unlockedCharacters = new Set(
+          actorEntries
+            .filter((video) => hasGreetingVideo(video))
+            .map((video) => normalizeName(video.personaje || 'Sin personaje'))
+            .filter(Boolean)
+        );
+
+        return {
+          totalCharacters: totalCharactersByNormalized.size,
+          unlockedCharacters: unlockedCharacters.size
+        };
+      };
       collectionModel.actors.forEach((item) => registerActorName(item?.name));
       VIDEOS.forEach((video) => registerActorName(video?.actor_de_doblaje));
       const actors = [...actorNameByNormalized.values()].sort((a, b) => a.localeCompare(b, 'es', { sensitivity: 'base' }));
@@ -6875,9 +6914,18 @@
 
             <div class="actor-gallery mock-gap-lg">
               ${actors.map((name) => `
+                ${(() => {
+                  const { totalCharacters, unlockedCharacters } = getActorCharacterStats(name);
+                  return `
                 <button type="button" class="actor-card" data-actor-card="${escapeHtml(name)}">
                   <h3 class="actor-card-title">${escapeHtml(name)}</h3>
+                  <div class="actor-card-footer">
+                    <p class="actor-card-meta actor-card-meta--left">(${totalCharacters}) personajes</p>
+                    <p class="actor-card-meta actor-card-meta--right">(${unlockedCharacters}) desbloqueados</p>
+                  </div>
                 </button>
+                `;
+                })()}
               `).join('') || '<p class="muted">No hay actores registrados.</p>'}
             </div>
           </section>

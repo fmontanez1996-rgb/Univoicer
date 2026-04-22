@@ -7030,9 +7030,14 @@
       });
 
       const actorRenameModal = document.getElementById('actorRenameModal');
-      const closeActorRenameModal = () => {
+      const closeActorRenameModal = ({ restoreEditFocus = false } = {}) => {
         state.actorRenameModalOpen = false;
         renderActoresView();
+        if (restoreEditFocus) {
+          requestAnimationFrame(() => {
+            document.getElementById('editActorBtn')?.focus();
+          });
+        }
       };
       if (actorRenameModal) {
         const renameInput = document.getElementById('actorRenameInput');
@@ -7068,26 +7073,67 @@
         });
 
         renameInput?.addEventListener('input', () => setRenameValidation(''));
-        document.getElementById('cancelActorRenameBtn')?.addEventListener('click', closeActorRenameModal);
+        document.getElementById('cancelActorRenameBtn')?.addEventListener('click', () => {
+          closeActorRenameModal({ restoreEditFocus: true });
+        });
         actorRenameModal.addEventListener('click', (event) => {
-          if (event.target === actorRenameModal) closeActorRenameModal();
+          if (event.target === actorRenameModal) closeActorRenameModal({ restoreEditFocus: true });
         });
         document.getElementById('saveActorRenameBtn')?.addEventListener('click', () => {
           const cleanName = validateNewActorName();
           if (!cleanName) return;
-          VIDEOS.forEach(v => {
-            if (normalizeName(v.actor_de_doblaje) === normalizeName(actor)) v.actor_de_doblaje = cleanName;
+          const normalizedCurrentActor = normalizeName(actor);
+          const normalizedNextActor = normalizeName(cleanName);
+
+          const renamedVideos = VIDEOS.map((video) => {
+            if (normalizeName(video?.actor_de_doblaje || '') !== normalizedCurrentActor) return video;
+            return { ...video, actor_de_doblaje: cleanName };
           });
-          if (state.blockedCharactersByActor[actor]) {
-            state.blockedCharactersByActor[cleanName] = state.blockedCharactersByActor[actor];
-            delete state.blockedCharactersByActor[actor];
+          const touchedVideos = renamedVideos.some((video, index) => video !== VIDEOS[index]);
+
+          const nextBlockedCharactersByActor = Object.entries(state.blockedCharactersByActor || {}).reduce((acc, [actorName, list]) => {
+            const targetActorName = normalizeName(actorName) === normalizedCurrentActor ? cleanName : actorName;
+            const safeList = Array.isArray(list) ? list : [];
+            if (!acc[targetActorName]) {
+              acc[targetActorName] = [...safeList];
+              return acc;
+            }
+            acc[targetActorName] = [...new Set([...acc[targetActorName], ...safeList])];
+            return acc;
+          }, {});
+
+          let touchedCollectionModel = false;
+          (collectionModel.actors || []).forEach((item) => {
+            if (normalizeName(item?.name || '') !== normalizedCurrentActor) return;
+            if (normalizeName(item.name || '') === normalizedNextActor && item.name === cleanName) return;
+            item.name = cleanName;
+            touchedCollectionModel = true;
+          });
+
+          if (touchedVideos) {
+            VIDEOS.splice(0, VIDEOS.length, ...renamedVideos);
           }
+          state.blockedCharactersByActor = nextBlockedCharactersByActor;
           state.actorFocus = cleanName;
           state.actorRenameModalOpen = false;
+
           saveBlockedCharacters();
-          saveVideos();
+          if (touchedVideos) {
+            saveVideos();
+          } else if (touchedCollectionModel) {
+            saveCollectionModel();
+          }
           refreshDependentViews();
           renderActoresView();
+          requestAnimationFrame(() => {
+            document.getElementById('editActorBtn')?.focus();
+          });
+        });
+        actorRenameModal.addEventListener('keydown', (event) => {
+          if (event.key === 'Escape') {
+            event.preventDefault();
+            closeActorRenameModal({ restoreEditFocus: true });
+          }
         });
       }
 
